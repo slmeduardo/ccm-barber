@@ -26,7 +26,7 @@ const Navigation = () => {
         <div className="flex justify-between h-16">
           <div className="flex">
             <Link to="/" className="flex items-center">
-              <span className="font-display text-xl font-semibold text-foreground">NYC Premium Barber</span>
+              <img src="/lovable-uploads/3938081c-f339-4921-b90f-f5ff2a42361d.png" alt="CGM Logo" className="h-8 w-auto" />
             </Link>
           </div>
 
