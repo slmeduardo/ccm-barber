@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, X, Scissors, Users, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AuthDialogs } from "./auth/AuthDialogs";
 import { Button } from "@/components/ui/button";
 
 const Navigation = () => {
@@ -44,20 +45,13 @@ const Navigation = () => {
                 {item.name}
               </Link>
             ))}
-            <div className="flex items-center space-x-4">
-              <Button variant="outline" size="sm">
-                Log in
-              </Button>
-              <Button className="bg-primary hover:bg-primary/90" size="sm">
-                Sign up
-              </Button>
-            </div>
+            <AuthDialogs />
           </div>
 
           {/* Mobile menu button */}
           <div className="flex items-center space-x-4 md:hidden">
-            <Button variant="outline" size="sm">
-              Log in
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/login">Log in</Link>
             </Button>
             <button
               onClick={() => setIsOpen(!isOpen)}
@@ -94,8 +88,8 @@ const Navigation = () => {
             </Link>
           ))}
           <div className="px-3 py-2">
-            <Button className="w-full bg-primary hover:bg-primary/90" size="sm">
-              Sign up
+            <Button className="w-full bg-primary hover:bg-primary/90" size="sm" asChild>
+              <Link to="/signup">Sign up</Link>
             </Button>
           </div>
         </div>
