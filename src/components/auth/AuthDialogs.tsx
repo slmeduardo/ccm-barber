@@ -4,13 +4,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { LoginForm } from "./LoginForm"
 import { SignUpForm } from "./SignUpForm"
 import { useNavigate } from "react-router-dom"
-import { useMediaQuery } from "@/hooks/use-mobile"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 export function AuthDialogs() {
   const [loginOpen, setLoginOpen] = useState(false)
   const [signUpOpen, setSignUpOpen] = useState(false)
   const navigate = useNavigate()
-  const isMobile = useMediaQuery("(max-width: 768px)")
+  const isMobile = useIsMobile()
 
   const handleLoginClick = () => {
     if (isMobile) {
