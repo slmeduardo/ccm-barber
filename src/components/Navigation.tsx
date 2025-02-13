@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Scissors, Users, Calendar } from "lucide-react";
+import { Menu, X, Scissors, Users, Calendar, Clock, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AuthDialogs } from "./auth/AuthDialogs";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,8 @@ const Navigation = () => {
     { name: "Services", href: "/services", icon: Scissors },
     { name: "Team", href: "/team", icon: Users },
     { name: "Book", href: "/book", icon: Calendar },
+    { name: "Schedules", href: "/schedules", icon: Clock },
+    { name: "Management", href: "/management", icon: Settings },
   ];
 
   const isActive = (path: string) => location.pathname === path;
