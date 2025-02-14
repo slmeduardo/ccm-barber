@@ -3,12 +3,59 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Scissors, Clock, MapPin } from "lucide-react";
 import { Link } from "react-router-dom";
 import { BarbershopProfile } from "@/components/barbershop/BarbershopProfile";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Index = () => {
-  const navigation = [
-    { name: "Services", href: "/services", icon: Scissors },
-    { name: "Book Now", href: "/book", icon: Clock },
-    { name: "Find Us", href: "#location", icon: MapPin },
+  const tabs = [
+    { 
+      id: "services",
+      name: "Services", 
+      icon: Scissors,
+      content: (
+        <div className="py-8">
+          <h2 className="text-2xl font-semibold mb-6">Our Services</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-6 border rounded-lg">
+              <h3 className="text-xl font-semibold mb-2">Haircut</h3>
+              <p className="text-muted-foreground mb-4">Classic or modern cuts tailored to your style</p>
+              <p className="font-semibold">$30</p>
+            </div>
+            <div className="p-6 border rounded-lg">
+              <h3 className="text-xl font-semibold mb-2">Beard Trim</h3>
+              <p className="text-muted-foreground mb-4">Professional beard grooming and styling</p>
+              <p className="font-semibold">$20</p>
+            </div>
+          </div>
+        </div>
+      )
+    },
+    { 
+      id: "book",
+      name: "Book Now", 
+      icon: Clock,
+      content: (
+        <div className="py-8">
+          <h2 className="text-2xl font-semibold mb-6">Book an Appointment</h2>
+          <p className="text-muted-foreground mb-6">
+            Choose your preferred service and time slot to book your appointment.
+          </p>
+          <Button>Schedule Now</Button>
+        </div>
+      )
+    },
+    { 
+      id: "location",
+      name: "Find Us", 
+      icon: MapPin,
+      content: (
+        <div className="py-8">
+          <h2 className="text-2xl font-semibold mb-6">Our Location</h2>
+          <div className="aspect-video w-full rounded-lg bg-muted flex items-center justify-center">
+            Map will be displayed here
+          </div>
+        </div>
+      )
+    }
   ];
 
   return (
@@ -16,21 +63,28 @@ const Index = () => {
       {/* Barbershop Profile */}
       <BarbershopProfile />
 
-      {/* Secondary Navigation */}
+      {/* Tabbed Navigation */}
       <div className="border-t border-border mt-8">
         <div className="container mx-auto px-4">
-          <div className="flex justify-center space-x-8 py-4">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                to={item.href}
-                className="flex items-center space-x-2 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <item.icon className="w-4 h-4" />
-                <span>{item.name}</span>
-              </Link>
+          <Tabs defaultValue="services" className="w-full">
+            <TabsList className="flex justify-center w-full h-16 bg-transparent">
+              {tabs.map((tab) => (
+                <TabsTrigger
+                  key={tab.id}
+                  value={tab.id}
+                  className="flex items-center space-x-2 px-6"
+                >
+                  <tab.icon className="w-4 h-4" />
+                  <span>{tab.name}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {tabs.map((tab) => (
+              <TabsContent key={tab.id} value={tab.id} className="mt-6">
+                {tab.content}
+              </TabsContent>
             ))}
-          </div>
+          </Tabs>
         </div>
       </div>
 
