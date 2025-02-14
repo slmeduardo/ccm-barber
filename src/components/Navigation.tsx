@@ -5,17 +5,21 @@ import { Menu, X, Scissors, Users, Calendar, Clock, Settings } from "lucide-reac
 import { cn } from "@/lib/utils";
 import { AuthDialogs } from "./auth/AuthDialogs";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "./ThemeToggle";
+import { LanguageToggle } from "./LanguageToggle";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const { t } = useLanguage();
 
   const navigation = [
-    { name: "Services", href: "/services", icon: Scissors },
-    { name: "Team", href: "/team", icon: Users },
-    { name: "Book", href: "/book", icon: Calendar },
-    { name: "Schedules", href: "/schedules", icon: Clock },
-    { name: "Management", href: "/management", icon: Settings },
+    { name: t("services"), href: "/services", icon: Scissors },
+    { name: t("team"), href: "/team", icon: Users },
+    { name: t("book"), href: "/book", icon: Calendar },
+    { name: t("schedules"), href: "/schedules", icon: Clock },
+    { name: t("management"), href: "/management", icon: Settings },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -47,13 +51,18 @@ const Navigation = () => {
                 {item.name}
               </Link>
             ))}
-            <AuthDialogs />
+            <div className="flex items-center space-x-4">
+              <LanguageToggle />
+              <ThemeToggle />
+              <AuthDialogs />
+            </div>
           </div>
 
           {/* Mobile menu button */}
           <div className="flex items-center space-x-4 md:hidden">
+            <ThemeToggle />
             <Button variant="outline" size="sm" asChild>
-              <Link to="/login">Log in</Link>
+              <Link to="/login">{t("login")}</Link>
             </Button>
             <button
               onClick={() => setIsOpen(!isOpen)}
@@ -89,9 +98,10 @@ const Navigation = () => {
               {item.name}
             </Link>
           ))}
-          <div className="px-3 py-2">
+          <div className="px-3 py-2 space-y-2">
+            <LanguageToggle />
             <Button className="w-full bg-primary hover:bg-primary/90" size="sm" asChild>
-              <Link to="/signup">Sign up</Link>
+              <Link to="/signup">{t("signup")}</Link>
             </Button>
           </div>
         </div>
