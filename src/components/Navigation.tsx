@@ -1,108 +1,50 @@
 
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Scissors, Users, Calendar, Clock, Settings } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Search, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AuthDialogs } from "./auth/AuthDialogs";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageToggle } from "./LanguageToggle";
+import { Input } from "./ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 const Navigation = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const location = useLocation();
   const { t } = useLanguage();
-
-  const navigation = [
-    { name: t("services"), href: "/services", icon: Scissors },
-    { name: t("team"), href: "/team", icon: Users },
-    { name: t("book"), href: "/book", icon: Calendar },
-    { name: t("schedules"), href: "/schedules", icon: Clock },
-    { name: t("management"), href: "/management", icon: Settings },
-  ];
-
-  const isActive = (path: string) => location.pathname === path;
 
   return (
     <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg z-50 border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex">
-            <Link to="/" className="flex items-center">
-              <img src="/lovable-uploads/3938081c-f339-4921-b90f-f5ff2a42361d.png" alt="CGM Logo" className="h-8 w-auto" />
-            </Link>
-          </div>
+        <div className="flex justify-between items-center h-16 gap-4">
+          {/* Logo */}
+          <Link to="/" className="flex-shrink-0">
+            <img src="/lovable-uploads/3938081c-f339-4921-b90f-f5ff2a42361d.png" alt="CGM Logo" className="h-8 w-auto" />
+          </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex md:items-center md:space-x-8">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={cn(
-                  "inline-flex items-center px-1 pt-1 text-sm font-medium transition-colors duration-200",
-                  isActive(item.href)
-                    ? "text-primary border-b-2 border-primary"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <item.icon className="w-4 h-4 mr-2" />
-                {item.name}
-              </Link>
-            ))}
-            <div className="flex items-center space-x-4">
-              <LanguageToggle />
-              <ThemeToggle />
-              <AuthDialogs />
+          {/* Search Bar */}
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search barbershops..."
+                className="w-full pl-10"
+              />
             </div>
           </div>
 
-          {/* Mobile menu button */}
-          <div className="flex items-center space-x-4 md:hidden">
-            <ThemeToggle />
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/login">{t("login")}</Link>
+          {/* Navigation Items */}
+          <div className="flex items-center space-x-4">
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/appointments" className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                My Appointments
+              </Link>
             </Button>
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="inline-flex items-center justify-center p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
-            >
-              <span className="sr-only">Open main menu</span>
-              {isOpen ? (
-                <X className="block h-6 w-6" aria-hidden="true" />
-              ) : (
-                <Menu className="block h-6 w-6" aria-hidden="true" />
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile menu */}
-      <div className={cn("md:hidden", isOpen ? "block" : "hidden")}>
-        <div className="pt-2 pb-3 space-y-1">
-          {navigation.map((item) => (
-            <Link
-              key={item.name}
-              to={item.href}
-              className={cn(
-                "flex items-center pl-3 pr-4 py-2 text-base font-medium transition-colors duration-200",
-                isActive(item.href)
-                  ? "text-primary border-l-4 border-primary bg-primary/5"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
-              )}
-              onClick={() => setIsOpen(false)}
-            >
-              <item.icon className="w-5 h-5 mr-3" />
-              {item.name}
-            </Link>
-          ))}
-          <div className="px-3 py-2 space-y-2">
             <LanguageToggle />
-            <Button className="w-full bg-primary hover:bg-primary/90" size="sm" asChild>
-              <Link to="/signup">{t("signup")}</Link>
-            </Button>
+            <ThemeToggle />
+            <AuthDialogs />
           </div>
         </div>
       </div>
