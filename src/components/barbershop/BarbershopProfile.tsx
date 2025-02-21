@@ -1,7 +1,4 @@
-
-import { Instagram, Facebook, Phone, Mail, Clock, MapPin, CreditCard, Wifi, Car, Accessibility, Baby, Star } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   Carousel,
   CarouselContent,
@@ -9,13 +6,26 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  Accessibility,
+  Baby,
+  Car,
+  Clock,
+  CreditCard,
+  Facebook,
+  Instagram,
+  Mail,
+  MapPin,
+  Phone,
+  Star,
+  Wifi,
+} from "lucide-react";
+import { Link } from "react-router-dom";
 
 export function BarbershopProfile() {
-  const images = [
-    "/placeholder.svg",
-    "/placeholder.svg",
-    "/placeholder.svg",
-  ];
+  const { authUser } = useAuth();
+  const images = ["/placeholder.svg", "/placeholder.svg", "/placeholder.svg"];
 
   const comfortFeatures = [
     { icon: Wifi, label: "Free Wi-Fi" },
@@ -34,27 +44,23 @@ export function BarbershopProfile() {
             {[1, 2, 3, 4, 5].map((star) => (
               <Star key={star} className="w-4 h-4 fill-current" />
             ))}
-            <span className="ml-2 text-sm text-muted-foreground">(128 reviews)</span>
+            <span className="ml-2 text-sm text-muted-foreground">
+              (128 reviews)
+            </span>
           </div>
           <p className="text-lg text-muted-foreground max-w-2xl">
-            Classic Cuts is your premier destination for traditional and modern grooming services. 
-            Our skilled barbers combine time-honored techniques with contemporary styles to deliver 
-            the perfect cut every time.
+            Classic Cuts is your premier destination for traditional and modern
+            grooming services. Our skilled barbers combine time-honored
+            techniques with contemporary styles to deliver the perfect cut every
+            time.
           </p>
         </div>
-        <Button size="lg" className="font-semibold">
+        <Link
+          to={authUser ? "/book" : "/auth"}
+          className="bg-primary text-white px-6 py-3 rounded-md font-semibold"
+        >
           Book Appointment
-        </Button>
-      </div>
-
-      {/* Comfort Features */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-        {comfortFeatures.map((feature) => (
-          <div key={feature.label} className="flex items-center gap-3 p-4 border rounded-lg">
-            <feature.icon className="w-5 h-5 text-primary" />
-            <span className="font-medium">{feature.label}</span>
-          </div>
-        ))}
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -77,6 +83,19 @@ export function BarbershopProfile() {
             <CarouselPrevious />
             <CarouselNext />
           </Carousel>
+
+          {/* Comfort Features */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 my-8">
+            {comfortFeatures.map((feature) => (
+              <div
+                key={feature.label}
+                className="flex flex-col text-center justify-center items-center gap-3 p-4 border rounded-lg"
+              >
+                <feature.icon className="w-7 h-7 text-primary" />
+                <span className="font-medium">{feature.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Info Card */}
@@ -132,13 +151,22 @@ export function BarbershopProfile() {
                 <div className="space-y-2">
                   <p className="text-muted-foreground">+1 (555) 123-4567</p>
                   <div className="flex gap-4">
-                    <a href="#" className="text-muted-foreground hover:text-primary">
+                    <a
+                      href="#"
+                      className="text-muted-foreground hover:text-primary"
+                    >
                       <Instagram className="w-5 h-5" />
                     </a>
-                    <a href="#" className="text-muted-foreground hover:text-primary">
+                    <a
+                      href="#"
+                      className="text-muted-foreground hover:text-primary"
+                    >
                       <Facebook className="w-5 h-5" />
                     </a>
-                    <a href="#" className="text-muted-foreground hover:text-primary">
+                    <a
+                      href="#"
+                      className="text-muted-foreground hover:text-primary"
+                    >
                       <Mail className="w-5 h-5" />
                     </a>
                   </div>

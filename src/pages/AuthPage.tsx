@@ -1,9 +1,9 @@
+import { LoginForm } from "@/components/auth/LoginForm";
+import { SignUpForm } from "@/components/auth/SignUpForm";
 import { auth } from "@/lib/firebase";
 import { User, onAuthStateChanged } from "firebase/auth";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LoginForm } from "./LoginForm";
-import { SignUpForm } from "./SignUpForm";
 
 export function AuthPage() {
   const [isLoginForm, setIsLoginForm] = useState(true);

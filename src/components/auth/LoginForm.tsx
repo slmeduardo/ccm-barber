@@ -1,15 +1,23 @@
-
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
-import * as z from "zod"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { auth } from "@/lib/firebase";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 
 const formSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-})
+  email: z.string().email("Email inválido"),
+  password: z.string().min(1, "A senha é obrigatória"),
+});
 
 export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
   const form = useForm<z.infer<typeof formSchema>>({
@@ -18,11 +26,63 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
       email: "",
       password: "",
     },
-  })
+  });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values)
-    onSuccess?.()
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        values.email,
+        values.password
+      );
+
+      console.log("Usuário logado:", {
+        uid: userCredential.user.uid,
+        email: userCredential.user.email,
+        name: userCredential.user.displayName,
+        emailVerified: userCredential.user.emailVerified,
+      });
+
+      onSuccess?.();
+    } catch (error: any) {
+      const errorMessage = "Ocorreu um erro ao fazer login.";
+
+      switch (error.code) {
+        case "auth/invalid-email":
+          form.setError("email", { message: "O formato do email é inválido." });
+          break;
+        case "auth/user-disabled":
+          form.setError("email", { message: "Esta conta foi desativada." });
+          break;
+        case "auth/user-not-found":
+          form.setError("email", {
+            message:
+              "Email não encontrado. Por favor, verifique suas credenciais.",
+          });
+          break;
+        case "auth/wrong-password":
+          form.setError("password", {
+            message: "Senha incorreta. Por favor, tente novamente.",
+          });
+          break;
+        case "auth/too-many-requests":
+          form.setError("root", {
+            message:
+              "Muitas tentativas de login. Por favor, tente novamente mais tarde.",
+          });
+          break;
+        case "auth/network-request-failed":
+          form.setError("root", {
+            message: "Erro de conexão. Verifique sua internet.",
+          });
+          break;
+        default:
+          console.error("Erro ao fazer login:", error);
+          form.setError("root", {
+            message: "Ocorreu um erro ao fazer login. Tente novamente.",
+          });
+      }
+    }
   }
 
   return (
@@ -35,7 +95,11 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input placeholder="email@example.com" {...field} type="email" />
+                <Input
+                  placeholder="email@example.com"
+                  {...field}
+                  type="email"
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -46,7 +110,7 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Password</FormLabel>
+              <FormLabel>Senha</FormLabel>
               <FormControl>
                 <Input {...field} type="password" />
               </FormControl>
@@ -54,10 +118,15 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
             </FormItem>
           )}
         />
+        {form.formState.errors.root && (
+          <div className="text-sm font-medium text-destructive">
+            {form.formState.errors.root.message}
+          </div>
+        )}
         <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
-          Login
+          Entrar
         </Button>
       </form>
     </Form>
-  )
+  );
 }

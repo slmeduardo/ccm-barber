@@ -1,15 +1,13 @@
-
-import { Button } from "@/components/ui/button";
-import { ArrowRight, Scissors, Clock, MapPin } from "lucide-react";
-import { Link } from "react-router-dom";
 import { BarbershopProfile } from "@/components/barbershop/BarbershopProfile";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Clock, MapPin, Scissors } from "lucide-react";
 
 const Index = () => {
   const tabs = [
-    { 
+    {
       id: "services",
-      name: "Services", 
+      name: "Services",
       icon: Scissors,
       content: (
         <div className="py-8">
@@ -17,35 +15,42 @@ const Index = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="p-6 border rounded-lg">
               <h3 className="text-xl font-semibold mb-2">Haircut</h3>
-              <p className="text-muted-foreground mb-4">Classic or modern cuts tailored to your style</p>
+              <p className="text-muted-foreground mb-4">
+                Classic or modern cuts tailored to your style
+              </p>
               <p className="font-semibold">$30</p>
             </div>
             <div className="p-6 border rounded-lg">
               <h3 className="text-xl font-semibold mb-2">Beard Trim</h3>
-              <p className="text-muted-foreground mb-4">Professional beard grooming and styling</p>
+              <p className="text-muted-foreground mb-4">
+                Professional beard grooming and styling
+              </p>
               <p className="font-semibold">$20</p>
             </div>
           </div>
         </div>
-      )
+      ),
     },
-    { 
+    {
       id: "book",
-      name: "Book Now", 
+      name: "Book Now",
       icon: Clock,
       content: (
         <div className="py-8">
-          <h2 className="text-2xl font-semibold mb-6">Book an Appointment</h2>
+          <h2 className="text-2xl font-semibold mb-6">
+            Book an Appointmeneqwdast
+          </h2>
           <p className="text-muted-foreground mb-6">
-            Choose your preferred service and time slot to book your appointment.
+            Choose your preferred service and time slot to book your
+            appointment.
           </p>
           <Button>Schedule Now</Button>
         </div>
-      )
+      ),
     },
-    { 
+    {
       id: "location",
-      name: "Find Us", 
+      name: "Find Us",
       icon: MapPin,
       content: (
         <div className="py-8">
@@ -54,8 +59,8 @@ const Index = () => {
             Map will be displayed here
           </div>
         </div>
-      )
-    }
+      ),
+    },
   ];
 
   return (
@@ -98,7 +103,8 @@ const Index = () => {
               </div>
               <h3 className="text-xl font-semibold mb-2">Expert Stylists</h3>
               <p className="text-muted-foreground">
-                Our master barbers bring years of experience and expertise to every cut.
+                Our master barbers bring years of experience and expertise to
+                every cut.
               </p>
             </div>
             <div className="text-center p-6">
