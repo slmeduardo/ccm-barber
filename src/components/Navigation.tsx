@@ -30,9 +30,7 @@ const navigation = [
   { name: "Serviços", href: "/services", icon: Scissors },
   { name: "Equipe", href: "/team", icon: Users },
   { name: "Agendamentos", href: "/book", icon: Calendar },
-  { name: "Agendamentos", href: "/schedules", icon: Clock },
-  // { name: "Management", href: "/management", icon: Settings },
-  { name: "Agendamentos", href: "/appointments", icon: CalendarSearch },
+  { name: "Meus Agendamentos", href: "/appointments", icon: CalendarSearch },
 ];
 
 const isActive = (path: string) => location.pathname === path;
@@ -88,20 +86,36 @@ export function Navigation() {
                   </NavLink>
                 ))}
                 {webUser?.isAdmin === true ? (
-                  <NavLink
-                    to="/management"
-                    className={({ isActive }) =>
-                      cn(
-                        "inline-flex items-center px-1 pt-1 text-sm font-medium transition-colors duration-200",
-                        isActive
-                          ? "text-primary border-b-2 py-2 border-primary"
-                          : "text-muted-foreground hover:text-foreground py-2"
-                      )
-                    }
-                  >
-                    <Settings className="w-4 h-4 mr-2" />
-                    Manutenção
-                  </NavLink>
+                  <>
+                    <NavLink
+                      to="/schedules"
+                      className={({ isActive }) =>
+                        cn(
+                          "inline-flex items-center px-1 pt-1 text-sm font-medium transition-colors duration-200",
+                          isActive
+                            ? "text-primary border-b-2 py-2 border-primary"
+                            : "text-muted-foreground hover:text-foreground py-2"
+                        )
+                      }
+                    >
+                      <Clock className="w-4 h-4 mr-2" />
+                      Horários
+                    </NavLink>
+                    <NavLink
+                      to="/management"
+                      className={({ isActive }) =>
+                        cn(
+                          "inline-flex items-center px-1 pt-1 text-sm font-medium transition-colors duration-200",
+                          isActive
+                            ? "text-primary border-b-2 py-2 border-primary"
+                            : "text-muted-foreground hover:text-foreground py-2"
+                        )
+                      }
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Manutenção
+                    </NavLink>
+                  </>
                 ) : null}
               </>
             )}
