@@ -13,18 +13,21 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -37,12 +40,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { useEmployees, useFirestore, useServices } from "@/hooks/useFirestore";
+import {
+  useEmployees,
+  useFirestore,
+  useServices,
+  useWebUsers,
+} from "@/hooks/useFirestore";
 import { db } from "@/lib/firebase";
-import { User } from "@/types/user";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { doc, getDoc } from "firebase/firestore";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { Navigate } from "react-router-dom";
+import * as z from "zod";
 
 type ServiceType = {
   description: string;
@@ -52,31 +63,69 @@ type ServiceType = {
   name: string;
 };
 
+type Employee = {
+  employee_id: string;
+  employee_name: string;
+  services: string[];
+};
+
+const serviceFormSchema = z.object({
+  name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
+  description: z.string().min(2, "Descrição deve ter pelo menos 2 caracteres"),
+  preco: z.coerce.number().min(0, "Preço deve ser maior que 0"),
+  service_duration: z.coerce.number().min(1, "Duração deve ser maior que 0"),
+});
+
+const employeeFormSchema = z.object({
+  employee_name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
+  services: z.array(z.string()).min(1, "Selecione pelo menos um serviço"),
+});
+
 const Management = () => {
   const { toast } = useToast();
-  const { updateDocument, deleteDocument, listUsers, updateUserRole } =
-    useFirestore();
-  const { employees, loading: employeesLoading } = useEmployees();
-  const { services, loading: servicesLoading } = useServices();
+  const { updateDocument, deleteDocument } = useFirestore();
+  const { employees, loading } = useEmployees();
   const [initialLoading, setInitialLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [checkboxStates, setCheckboxStates] = useState<{
     [key: string]: boolean;
   }>({});
+  const { services, loading: loadingServices } = useServices();
   const [team, setTeam] = useState<Employee[]>([]);
+  const { user: authUser } = useAuth();
+  const { webUsers } = useWebUsers();
+  const webUser = webUsers.find((user) => user.user_id === authUser?.uid);
+
+  // Estados para os diálogos
+  const [isServiceDialogOpen, setIsServiceDialogOpen] = useState(false);
+  const [isEmployeeDialogOpen, setIsEmployeeDialogOpen] = useState(false);
   const [editingService, setEditingService] = useState<ServiceType | null>(
     null
   );
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isEmployeeDialogOpen, setIsEmployeeDialogOpen] = useState(false);
-  const [users, setUsers] = useState<User[]>([]);
-  const [totalUsers, setTotalUsers] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
-  const { role } = useAuth();
-  const itemsPerPage = 20;
+
+  // Formulários
+  const serviceForm = useForm<z.infer<typeof serviceFormSchema>>({
+    resolver: zodResolver(serviceFormSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      preco: 0,
+      service_duration: 1,
+    },
+  });
+
+  const employeeForm = useForm<z.infer<typeof employeeFormSchema>>({
+    resolver: zodResolver(employeeFormSchema),
+    defaultValues: {
+      employee_name: "",
+      services: [],
+    },
+  });
+
+  if (webUser?.isAdmin === false) {
+    return <Navigate to="/" />;
+  }
 
   const weekDays = [
     "Domingo",
@@ -100,9 +149,6 @@ const Management = () => {
     "17:00",
     "18:00",
   ];
-
-  // Extrair funcionários do primeiro grupo (assumindo que queremos todos os funcionários)
-  const allEmployees = employees.length > 0 ? employees[0].employees : [];
 
   // Função para carregar o estado inicial dos checkboxes do Firestore
   const loadInitialCheckboxStates = async () => {
@@ -144,10 +190,10 @@ const Management = () => {
 
   // Carrega os estados iniciais quando o componente montar e employees estiver disponível
   useEffect(() => {
-    if (employees.length > 0 && !employeesLoading) {
+    if (employees.length > 0 && !loading) {
       loadInitialCheckboxStates();
     }
-  }, [employees, employeesLoading]);
+  }, [employees, loading]);
 
   const handleCheckboxChange = async (day: string, time: string) => {
     try {
@@ -342,153 +388,159 @@ const Management = () => {
   };
 
   // Funções para gerenciar serviços
-  const handleServiceSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-
-    const serviceData = {
-      name: formData.get("name") as string,
-      description: formData.get("description") as string,
-      service_duration: Number(formData.get("duration")),
-      preco: Number(formData.get("preco")),
-    };
-
+  const handleCreateService = async (
+    data: z.infer<typeof serviceFormSchema>
+  ) => {
     try {
-      if (editingService) {
-        await updateDocument(
-          "services",
-          editingService.service_id,
-          serviceData
-        );
-        toast({
-          title: "Sucesso!",
-          description: "Serviço atualizado com sucesso.",
-        });
-      } else {
-        // Para novo serviço, use o nome como ID
-        await updateDocument("services", serviceData.name, serviceData);
-        toast({
-          title: "Sucesso!",
-          description: "Serviço criado com sucesso.",
-        });
-      }
-      setIsDialogOpen(false);
-      setEditingService(null);
+      await updateDocument("services", data.name, {
+        ...data,
+        service_id: data.name,
+      });
+      toast({
+        title: "Sucesso!",
+        description: "Serviço criado com sucesso.",
+      });
+      handleServiceDialogChange(false);
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Erro",
-        description: "Erro ao salvar serviço.",
+        description: "Erro ao criar serviço.",
       });
     }
   };
 
-  // Funções para gerenciar equipe
-  const handleEmployeeSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-
-    const employeeData = {
-      employee_name: formData.get("employee_name") as string,
-      services: (formData.get("services") as string)
-        .split(",")
-        .map((s) => s.trim()),
-    };
-
+  const handleEditService = async (data: z.infer<typeof serviceFormSchema>) => {
+    if (!editingService) return;
     try {
-      if (editingEmployee) {
-        // Atualizar funcionário existente no grupo
-        const updatedEmployees = allEmployees.map((emp) =>
-          emp.employee_id === editingEmployee.employee_id
-            ? { ...emp, ...employeeData }
-            : emp
-        );
-
-        await updateDocument("employees", employees[0].employee_id, {
-          employees: updatedEmployees,
-        });
-
-        toast({
-          title: "Sucesso!",
-          description: "Funcionário atualizado com sucesso.",
-        });
-      } else {
-        // Adicionar novo funcionário ao grupo
-        const newEmployee = {
-          ...employeeData,
-          employee_id: Date.now().toString(), // ID único
-        };
-
-        await updateDocument("employees", employees[0].employee_id, {
-          employees: [...allEmployees, newEmployee],
-        });
-
-        toast({
-          title: "Sucesso!",
-          description: "Funcionário adicionado com sucesso.",
-        });
-      }
-      setIsEmployeeDialogOpen(false);
-      setEditingEmployee(null);
+      await updateDocument("services", editingService.service_id, {
+        ...data,
+        service_id: editingService.service_id,
+      });
+      toast({
+        title: "Sucesso!",
+        description: "Serviço atualizado com sucesso.",
+      });
+      handleServiceDialogChange(false);
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Erro",
-        description: "Erro ao salvar funcionário.",
+        description: "Erro ao atualizar serviço.",
       });
     }
   };
 
-  // Função para carregar usuários
-  const loadUsers = async () => {
+  // Funções para gerenciar funcionários
+  const handleCreateEmployee = async (
+    data: z.infer<typeof employeeFormSchema>
+  ) => {
     try {
-      setIsSearching(true);
-      const { users: fetchedUsers, total } = await listUsers(
-        currentPage,
-        itemsPerPage,
-        searchTerm
-      );
-      setUsers(fetchedUsers);
-      setTotalUsers(total);
+      const newEmployee = {
+        employee_id: data.employee_name,
+        ...data,
+      };
+      await updateDocument("employees", data.employee_name, {
+        employees: [newEmployee],
+      });
+      toast({
+        title: "Sucesso!",
+        description: "Funcionário criado com sucesso.",
+      });
+      handleEmployeeDialogChange(false);
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Erro",
-        description: "Erro ao carregar usuários.",
+        description: "Erro ao criar funcionário.",
       });
-    } finally {
-      setIsSearching(false);
     }
   };
 
-  // Carregar usuários quando a página ou termo de busca mudar
+  const handleEditEmployee = async (
+    data: z.infer<typeof employeeFormSchema>
+  ) => {
+    if (!editingEmployee) return;
+    try {
+      const updatedEmployee = {
+        employee_id: editingEmployee.employee_id,
+        ...data,
+      };
+      await updateDocument("employees", editingEmployee.employee_id, {
+        employees: [updatedEmployee],
+      });
+      toast({
+        title: "Sucesso!",
+        description: "Funcionário atualizado com sucesso.",
+      });
+      handleEmployeeDialogChange(false);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro ao atualizar funcionário.",
+      });
+    }
+  };
+
+  // Efeitos para carregar dados
   useEffect(() => {
-    loadUsers();
-  }, [currentPage, searchTerm]);
+    if (employees.length > 0) {
+      setTeam(employees[0]?.employees || []);
+    }
+  }, [employees]);
 
-  // Função para atualizar role do usuário
-  const handleRoleUpdate = async (uid: string, newRole: "admin" | "user") => {
-    try {
-      await updateUserRole(uid, newRole);
-      setUsers((prevUsers) =>
-        prevUsers.map((user) =>
-          user.uid === uid ? { ...user, role: newRole } : user
-        )
-      );
-      toast({
-        title: "Sucesso",
-        description: `Usuário atualizado para ${newRole}.`,
+  // Efeitos para os formulários
+  useEffect(() => {
+    if (editingService) {
+      serviceForm.reset({
+        name: editingService.name,
+        description: editingService.description,
+        preco: editingService.preco,
+        service_duration: editingService.service_duration,
       });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Erro ao atualizar papel do usuário.",
+    }
+  }, [editingService]);
+
+  useEffect(() => {
+    if (editingEmployee) {
+      employeeForm.reset({
+        employee_name: editingEmployee.employee_name,
+        services: editingEmployee.services,
+      });
+    }
+  }, [editingEmployee]);
+
+  // Funções para gerenciar os diálogos
+  const handleServiceDialogChange = (open: boolean) => {
+    setIsServiceDialogOpen(open);
+    if (!open) {
+      setEditingService(null);
+      serviceForm.reset({
+        name: "",
+        description: "",
+        preco: 0,
+        service_duration: 1,
       });
     }
   };
 
-  if (employeesLoading || servicesLoading || initialLoading) {
+  const handleEmployeeDialogChange = (open: boolean) => {
+    setIsEmployeeDialogOpen(open);
+    if (!open) {
+      setEditingEmployee(null);
+      employeeForm.reset({
+        employee_name: "",
+        services: [],
+      });
+    }
+  };
+
+  const formatPhoneNumber = (phone: string) => {
+    return phone.split("@")[0].slice(2);
+  };
+
+  if (loading || loadingServices || initialLoading) {
     return <div>Carregando...</div>;
   }
 
@@ -567,74 +619,99 @@ const Management = () => {
           </TabsContent>
 
           <TabsContent value="services">
-            <div className="flex justify-end mb-4">
-              <Button
-                onClick={() => {
-                  setEditingService(null);
-                  setIsDialogOpen(true);
-                }}
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold">Serviços</h2>
+              <Dialog
+                open={isServiceDialogOpen}
+                onOpenChange={handleServiceDialogChange}
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Serviço
-              </Button>
-            </div>
-
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>
-                    {editingService ? "Editar Serviço" : "Novo Serviço"}
-                  </DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleServiceSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nome</Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      defaultValue={editingService?.name}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Descrição</Label>
-                    <Input
-                      id="description"
-                      name="description"
-                      defaultValue={editingService?.description}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="duration">
-                      Duração (em intervalos de 15min)
-                    </Label>
-                    <Input
-                      id="duration"
-                      name="duration"
-                      type="number"
-                      defaultValue={editingService?.service_duration}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="preco">Preço</Label>
-                    <Input
-                      id="preco"
-                      name="preco"
-                      type="number"
-                      step="0.01"
-                      defaultValue={editingService?.preco}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full">
-                    {editingService ? "Atualizar" : "Criar"}
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Novo Serviço
                   </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
-
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingService ? "Editar Serviço" : "Novo Serviço"}
+                    </DialogTitle>
+                    <DialogDescription>
+                      Preencha os campos abaixo para{" "}
+                      {editingService ? "editar o" : "criar um novo"} serviço.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Form {...serviceForm}>
+                    <form
+                      onSubmit={serviceForm.handleSubmit(
+                        editingService ? handleEditService : handleCreateService
+                      )}
+                      className="space-y-4"
+                    >
+                      <FormField
+                        control={serviceForm.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nome</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={serviceForm.control}
+                        name="description"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Descrição</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={serviceForm.control}
+                        name="preco"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Preço</FormLabel>
+                            <FormControl>
+                              <Input type="number" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={serviceForm.control}
+                        name="service_duration"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              Duração (em slots de 15 minutos)
+                            </FormLabel>
+                            <FormControl>
+                              <Input type="number" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <DialogFooter>
+                        <Button type="submit">
+                          {editingService ? "Salvar" : "Criar"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            </div>
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -665,7 +742,7 @@ const Management = () => {
                             size="icon"
                             onClick={() => {
                               setEditingService(service);
-                              setIsDialogOpen(true);
+                              setIsServiceDialogOpen(true);
                             }}
                           >
                             <Pencil className="h-4 w-4" />
@@ -707,58 +784,100 @@ const Management = () => {
           </TabsContent>
 
           <TabsContent value="team">
-            <div className="flex justify-end mb-4">
-              <Button
-                onClick={() => {
-                  setEditingEmployee(null);
-                  setIsEmployeeDialogOpen(true);
-                }}
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold">Equipe</h2>
+              <Dialog
+                open={isEmployeeDialogOpen}
+                onOpenChange={handleEmployeeDialogChange}
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Funcionário
-              </Button>
-            </div>
-
-            <Dialog
-              open={isEmployeeDialogOpen}
-              onOpenChange={setIsEmployeeDialogOpen}
-            >
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>
-                    {editingEmployee
-                      ? "Editar Funcionário"
-                      : "Novo Funcionário"}
-                  </DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleEmployeeSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="employee_name">Nome</Label>
-                    <Input
-                      id="employee_name"
-                      name="employee_name"
-                      defaultValue={editingEmployee?.employee_name}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="services">
-                      Serviços (separados por vírgula)
-                    </Label>
-                    <Input
-                      id="services"
-                      name="services"
-                      defaultValue={editingEmployee?.services.join(", ")}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full">
-                    {editingEmployee ? "Atualizar" : "Criar"}
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Novo Funcionário
                   </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
-
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingEmployee
+                        ? "Editar Funcionário"
+                        : "Novo Funcionário"}
+                    </DialogTitle>
+                    <DialogDescription>
+                      Preencha os campos abaixo para{" "}
+                      {editingEmployee ? "editar o" : "criar um novo"}{" "}
+                      funcionário.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Form {...employeeForm}>
+                    <form
+                      onSubmit={employeeForm.handleSubmit(
+                        editingEmployee
+                          ? handleEditEmployee
+                          : handleCreateEmployee
+                      )}
+                      className="space-y-4"
+                    >
+                      <FormField
+                        control={employeeForm.control}
+                        name="employee_name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nome</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={employeeForm.control}
+                        name="services"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Serviços</FormLabel>
+                            <FormControl>
+                              <div className="flex flex-wrap gap-2">
+                                {services.map((service) => (
+                                  <Button
+                                    key={service.service_id}
+                                    type="button"
+                                    variant={
+                                      field.value.includes(service.name)
+                                        ? "default"
+                                        : "outline"
+                                    }
+                                    onClick={() => {
+                                      const newValue = field.value.includes(
+                                        service.name
+                                      )
+                                        ? field.value.filter(
+                                            (s) => s !== service.name
+                                          )
+                                        : [...field.value, service.name];
+                                      field.onChange(newValue);
+                                    }}
+                                  >
+                                    {service.name}
+                                  </Button>
+                                ))}
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <DialogFooter>
+                        <Button type="submit">
+                          {editingEmployee ? "Salvar" : "Criar"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            </div>
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -769,7 +888,7 @@ const Management = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {allEmployees.map((employee) => (
+                  {team.map((employee) => (
                     <TableRow key={employee.employee_id}>
                       <TableCell>{employee.employee_name}</TableCell>
                       <TableCell>{employee.services.join(", ")}</TableCell>
@@ -823,87 +942,38 @@ const Management = () => {
           </TabsContent>
 
           <TabsContent value="users">
-            <div className="space-y-4">
-              <div className="flex gap-4">
-                <Input
-                  placeholder="Buscar usuários..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="max-w-sm"
-                />
-              </div>
-
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Criado em</TableHead>
-                      <TableHead>Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((user) => (
-                      <TableRow key={user.uid}>
-                        <TableCell>{user.email}</TableCell>
-                        <TableCell>{user.displayName || "-"}</TableCell>
-                        <TableCell>{user.role}</TableCell>
-                        <TableCell>
-                          {user.createdAt
-                            ? new Date(user.createdAt).toLocaleDateString()
-                            : "-"}
-                        </TableCell>
-                        <TableCell>
-                          {role === "admin" && (
-                            <Button
-                              variant={
-                                user.role === "admin"
-                                  ? "destructive"
-                                  : "default"
-                              }
-                              onClick={() =>
-                                handleRoleUpdate(
-                                  user.uid,
-                                  user.role === "admin" ? "user" : "admin"
-                                )
-                              }
-                              size="sm"
-                            >
-                              {user.role === "admin"
-                                ? "Remover Admin"
-                                : "Tornar Admin"}
-                            </Button>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold">Usuários</h2>
+            </div>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Telefone</TableHead>
+                    <TableHead>Admin</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {webUsers.map((user) => (
+                    <TableRow key={user.user_id}>
+                      <TableCell>{user.name}</TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>{formatPhoneNumber(user.phone)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          {user.isAdmin ? (
+                            <span className="text-green-500">Sim</span>
+                          ) : (
+                            <span className="text-red-500">Não</span>
                           )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                    />
-                  </PaginationItem>
-                  {/* Adicione mais PaginationItems conforme necessário */}
-                  <PaginationItem>
-                    <PaginationNext
-                      onClick={() =>
-                        setCurrentPage((p) =>
-                          p * itemsPerPage < totalUsers ? p + 1 : p
-                        )
-                      }
-                      disabled={currentPage * itemsPerPage >= totalUsers}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           </TabsContent>
         </Tabs>

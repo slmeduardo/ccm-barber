@@ -6,7 +6,6 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import { useAuth } from "@/hooks/useAuth";
 import {
   Accessibility,
   Baby,
@@ -24,7 +23,6 @@ import {
 import { Link } from "react-router-dom";
 
 export function BarbershopProfile() {
-  const { authUser } = useAuth();
   const images = ["/placeholder.svg", "/placeholder.svg", "/placeholder.svg"];
 
   const comfortFeatures = [
@@ -56,7 +54,7 @@ export function BarbershopProfile() {
           </p>
         </div>
         <Link
-          to={authUser ? "/book" : "/auth"}
+          to={"/book"}
           className="bg-primary text-white px-6 py-3 rounded-md font-semibold"
         >
           Book Appointment

@@ -6,20 +6,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { db } from "@/config/firebaseConfig";
+import { useAuth } from "@/hooks/useAuth";
+import { useWebUsers } from "@/hooks/useFirestore";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { collection, getDocs, writeBatch } from "firebase/firestore";
 import { Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface Appointment {
   day: string;
@@ -29,41 +23,50 @@ interface Appointment {
   appointment_id: string;
 }
 
+interface DayTime {
+  hour: string;
+  client_id: string;
+  appointment_id: string;
+  service: string;
+}
+
+interface CalendarDay {
+  day: string;
+  day_time: DayTime[];
+}
+
+interface EmployeeData {
+  calendar: CalendarDay[];
+}
+
 export function Appointments() {
-  const [phone, setPhone] = useState<string>("");
-  const [isValidPhone, setIsValidPhone] = useState<boolean>(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [countryCode, setCountryCode] = useState<string>("+55");
+  const [countryCode] = useState<string>("+55");
   const [isOpen, setIsOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
+  const { user: authUser } = useAuth();
+  const { webUsers } = useWebUsers();
+  const webUser = webUsers.find((user) => user.user_id === authUser?.uid);
 
-  const handlePhoneChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    let value = event.target.value.replace(/\D/g, "");
-
-    if (value.length <= 11) {
-      value = value.replace(/^(\d{2})(\d)/g, "($1) $2");
-      value = value.replace(/(\d)(\d{4})$/, "$1-$2");
-      setPhone(value);
-      setIsValidPhone(true);
+  useEffect(() => {
+    if (webUser?.phone) {
+      handleSearch();
     }
-  };
+  }, [webUser]);
 
-  const handlePhoneBlur = () => {
-    const numbers = phone.replace(/\D/g, "");
-    const isValid = numbers.length === 10 || numbers.length === 11;
-    setIsValidPhone(isValid);
-  };
-
-  const formatPhoneForDatabase = (phone: string, countryCode: string) => {
-    const cleanNumber = countryCode.replace("+", "") + phone.replace(/\D/g, "");
-    return `${cleanNumber}@s.whatsapp.net`;
+  const formatPhoneForDatabase = (phone: string) => {
+    return phone;
   };
 
   const handleSearch = async () => {
+    if (!webUser?.phone) {
+      return;
+    }
+
     setLoading(true);
-    const formattedPhone = formatPhoneForDatabase(phone, countryCode);
+    const formattedPhone = formatPhoneForDatabase(webUser.phone);
     const foundAppointments: Appointment[] = [];
     const seenAppointmentIds = new Set();
 
@@ -72,14 +75,13 @@ export function Appointments() {
       const calendarSnapshot = await getDocs(calendarRef);
 
       calendarSnapshot.forEach((employeeDoc) => {
-        const employeeData = employeeDoc.data();
+        const employeeData = employeeDoc.data() as EmployeeData;
         const employeeName = employeeDoc.id;
 
-        employeeData.calendar.forEach((day: any) => {
-          day.day_time.forEach((timeSlot: any) => {
+        employeeData.calendar.forEach((day: CalendarDay) => {
+          day.day_time.forEach((timeSlot: DayTime) => {
             if (
-              timeSlot.client_id ===
-                `${formattedPhone.split("@")[0]}@s.whatsapp.net` &&
+              timeSlot.client_id === formattedPhone &&
               !seenAppointmentIds.has(timeSlot.appointment_id)
             ) {
               seenAppointmentIds.add(timeSlot.appointment_id);
@@ -123,9 +125,9 @@ export function Appointments() {
       const batch = writeBatch(db);
 
       calendarSnapshot.forEach((employeeDoc) => {
-        const employeeData = employeeDoc.data();
-        employeeData.calendar.forEach((day: any) => {
-          day.day_time.forEach((timeSlot: any) => {
+        const employeeData = employeeDoc.data() as EmployeeData;
+        employeeData.calendar.forEach((day: CalendarDay) => {
+          day.day_time.forEach((timeSlot: DayTime) => {
             if (timeSlot.appointment_id === appointmentId) {
               timeSlot.appointment_id = "";
               timeSlot.client_id = "none";
@@ -167,36 +169,13 @@ export function Appointments() {
         </p>
       </div>
 
-      <div className="flex gap-4 mb-8">
-        <div className="flex gap-2 flex-1">
-          <Select value={countryCode} onValueChange={setCountryCode}>
-            <SelectTrigger className="w-[110px]">
-              <SelectValue placeholder="País" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="+55">🇧🇷 +55</SelectItem>
-              <SelectItem value="+1">🇺🇸 +1</SelectItem>
-            </SelectContent>
-          </Select>
-          <Input
-            placeholder="(00) 00000-0000"
-            value={phone}
-            onChange={handlePhoneChange}
-            onBlur={handlePhoneBlur}
-            maxLength={15}
-            className="flex-1"
-          />
-        </div>
-        <Button
-          onClick={handleSearch}
-          disabled={!isValidPhone || loading}
-          className="w-32"
-        >
-          {loading ? "Buscando..." : "Buscar"}
-        </Button>
-      </div>
-
       <div className="space-y-6">
+        {loading && (
+          <p className="text-center text-gray-400">
+            Carregando agendamentos...
+          </p>
+        )}
+
         {appointments.map((appointment, index) => (
           <div
             key={index}
@@ -230,7 +209,7 @@ export function Appointments() {
           </div>
         ))}
 
-        {appointments.length === 0 && phone && isValidPhone && !loading && (
+        {appointments.length === 0 && !loading && (
           <p className="text-center text-gray-400">
             Nenhum agendamento encontrado para este número.
           </p>

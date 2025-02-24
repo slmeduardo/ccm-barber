@@ -3,7 +3,8 @@ import { Service } from "@/pages/Services";
 import { EmployeesListItem } from "@/pages/Team";
 import { api } from "@/services/api";
 import { User } from "@/types/user";
-import { collection, doc, getDocs, setDoc } from "firebase/firestore";
+import { webuser } from "@/types/webuser";
+import { addDoc, collection, doc, getDocs, setDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 
 export const useServices = () => {
@@ -34,6 +35,35 @@ export const useServices = () => {
   }, []);
 
   return { services, loading };
+};
+
+export const useWebUsers = () => {
+  const [webUsers, setWebUsers] = useState<webuser[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchWebUsers = async () => {
+      const webUsersCollection = collection(db, "webUsers");
+      const webUsersSnapshot = await getDocs(webUsersCollection);
+
+      const webUsersList = webUsersSnapshot.docs.map((doc) => ({
+        user_id: doc.id,
+        ...doc.data(),
+      })) as webuser[];
+
+      setWebUsers(webUsersList);
+    };
+
+    fetchWebUsers();
+  }, []);
+
+  return { webUsers, loading };
+};
+
+export const createWebUser = async (webUser: webuser) => {
+  const webUsersCollection = collection(db, "webUsers");
+  await addDoc(webUsersCollection, webUser);
+  return webUser;
 };
 
 export const useEmployees = () => {

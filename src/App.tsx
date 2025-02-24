@@ -1,4 +1,3 @@
-import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,7 +11,6 @@ import { LanguageProvider } from "./contexts/LanguageContext";
 import Book from "./pages/Book";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
-import { MakeAdmin } from "./pages/MakeAdmin";
 import Management from "./pages/Management";
 import NotFound from "./pages/NotFound";
 import Schedules from "./pages/Schedules";
@@ -36,50 +34,14 @@ const App = () => (
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<AuthPage />} />
-                  <Route
-                    path="/services"
-                    element={
-                      <ProtectedRoute>
-                        <Services />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/team"
-                    element={
-                      <ProtectedRoute>
-                        <Team />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/book"
-                    element={
-                      <ProtectedRoute>
-                        <Book />
-                      </ProtectedRoute>
-                    }
-                  />
+                  <Route path="/services" element={<Services />} />
+                  <Route path="/team" element={<Team />} />
+                  <Route path="/book" element={<Book />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/signup" element={<SignUp />} />
                   <Route path="/schedules" element={<Schedules />} />
-                  <Route
-                    path="/management"
-                    element={
-                      <ProtectedRoute allowedRoles={["admin"]}>
-                        <Management />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/appointments"
-                    element={
-                      <ProtectedRoute>
-                        <Appointments />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route path="/make-admin" element={<MakeAdmin />} />
+                  <Route path="/management" element={<Management />} />
+                  <Route path="/appointments" element={<Appointments />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </div>

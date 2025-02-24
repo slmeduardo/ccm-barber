@@ -16,9 +16,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
+import { createWebUser } from "@/hooks/useFirestore";
 import { auth } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
-import { api } from "@/services/api";
+import { webuser } from "@/types/webuser";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { Check, X } from "lucide-react";
@@ -84,14 +85,6 @@ export function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
     const numbers = phoneNumber.replace(/\D/g, "");
     // Verifica se tem 10 (fixo) ou 11 (celular) dígitos
     const isValid = numbers.length >= 10 && numbers.length <= 11;
-    console.log(
-      "Números:",
-      numbers,
-      "Tamanho:",
-      numbers.length,
-      "Válido:",
-      isValid
-    ); // Para debug
     setIsValidPhone(isValid);
     return isValid;
   };
@@ -113,6 +106,8 @@ export function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
       if (value.length > 7) {
         value = value.replace(/(\d)(\d{4})$/, "$1-$2");
       }
+      event.target.value = value;
+
       setPhone(value);
       // Valida o número a cada mudança
       validatePhone(value);
@@ -137,13 +132,25 @@ export function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
         formData.get("password") as string
       );
 
+      const formattedPhone = formatPhoneForDatabase(
+        formData.get("phone") as string,
+        countryCode
+      );
+
+      const webUser: webuser = {
+        user_id: userCredential.user.uid,
+        name: formData.get("name") as string,
+        email: formData.get("email") as string,
+        phone: formattedPhone,
+        isAdmin: false,
+      };
+
+      await createWebUser(webUser);
+
       // Atualizar perfil do usuário com o nome
       await updateProfile(userCredential.user, {
         displayName: formData.get("name") as string,
       });
-
-      // Temporariamente fazer todos os usuários admin
-      await api.updateUserRole(userCredential.user.uid, "admin");
 
       // Forçar atualização do token
       await userCredential.user.getIdToken(true);
@@ -206,21 +213,20 @@ export function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
                       <Select
                         value={countryCode}
                         onValueChange={setCountryCode}
-                        defaultValue="+55"
                       >
                         <SelectTrigger className="w-[100px] rounded-r-none">
                           <SelectValue placeholder="País" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="55">🇧🇷 +55</SelectItem>
-                          <SelectItem value="1">🇺🇸 +1</SelectItem>
+                          <SelectItem value="+55">🇧🇷 +55</SelectItem>
+                          <SelectItem value="+1">🇺🇸 +1</SelectItem>
                         </SelectContent>
                       </Select>
 
                       <Input
                         placeholder="(00) 00000-0000"
                         value={phone}
-                        onChange={(e) => handlePhoneChange(e, field)}
+                        onChangeCapture={(e) => handlePhoneChange(e, field)}
                         maxLength={15}
                         className={cn(
                           "flex-1 rounded-l-none border-l-0",

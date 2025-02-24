@@ -529,6 +529,9 @@ const Calendar = () => {
     }
   };
 
+  const selectedDatePlusOne = new Date(selectedDate);
+  selectedDatePlusOne.setDate(selectedDatePlusOne.getDate() + 1);
+
   return (
     <div>
       <div className="w-[240px] mb-10 flex flex-col gap-3">
@@ -556,7 +559,7 @@ const Calendar = () => {
             <DialogTitle>
               Configurar Dia{" "}
               {selectedDate &&
-                new Date(selectedDate).toLocaleDateString("pt-BR")}
+                new Date(selectedDatePlusOne).toLocaleDateString("pt-BR")}
             </DialogTitle>
           </DialogHeader>
 

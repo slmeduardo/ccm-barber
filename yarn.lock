@@ -2065,10 +2065,10 @@ base64-js@^1.3.0:
   resolved "https://registry.yarnpkg.com/base64-js/-/base64-js-1.5.1.tgz#1b1b440160a5bf7ad40b650f095963481903930a"
   integrity sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==
 
-better-auth@^1.1.18:
-  version "1.1.18"
-  resolved "https://registry.yarnpkg.com/better-auth/-/better-auth-1.1.18.tgz#339348af4a0988813ee06514323463640d17e541"
-  integrity sha512-cU/u7/qlSiR/OO1O53gh/bHvxyB53DE+5ZOw9DtpDI8IyIQUBqDnQ06MOwNtj8JwjXHcMFNSNd5u/W8DED0bJw==
+better-auth@^1.1.19:
+  version "1.1.19"
+  resolved "https://registry.yarnpkg.com/better-auth/-/better-auth-1.1.19.tgz#d8d8a18f2f665c563439ae4de905f9f18d078c59"
+  integrity sha512-OYf2oysca2+ASJ9hpGVkoLsz8b7bo65hHsVGpnIs9H5ORUnHJ7rKc6Wur4ZDCxuewBGUJMJyTAtXuo/cdAirjA==
   dependencies:
     "@better-auth/utils" "0.2.3"
     "@better-fetch/fetch" "1.1.12"
