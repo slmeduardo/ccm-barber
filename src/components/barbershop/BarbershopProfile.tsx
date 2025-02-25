@@ -26,10 +26,10 @@ export function BarbershopProfile() {
   const images = ["/placeholder.svg", "/placeholder.svg", "/placeholder.svg"];
 
   const comfortFeatures = [
-    { icon: Wifi, label: "Free Wi-Fi" },
-    { icon: Car, label: "Parking Available" },
-    { icon: Accessibility, label: "Accessible" },
-    { icon: Baby, label: "Kids Haircuts" },
+    { icon: Wifi, label: "Wi-Fi Grátis" },
+    { icon: Car, label: "Estacionamento Disponível" },
+    { icon: Accessibility, label: "Acessível" },
+    { icon: Baby, label: "Cabelo de Crianças" },
   ];
 
   return (
@@ -37,7 +37,7 @@ export function BarbershopProfile() {
       {/* Header Section */}
       <div className="flex justify-between items-start mb-6">
         <div>
-          <h1 className="text-4xl font-bold mb-2">Classic Cuts Barbershop</h1>
+          <h1 className="text-4xl font-bold mb-2">CCM Barbershop</h1>
           <div className="flex items-center gap-1 text-primary mb-4">
             {[1, 2, 3, 4, 5].map((star) => (
               <Star key={star} className="w-4 h-4 fill-current" />
@@ -47,17 +47,17 @@ export function BarbershopProfile() {
             </span>
           </div>
           <p className="text-lg text-muted-foreground max-w-2xl">
-            Classic Cuts is your premier destination for traditional and modern
-            grooming services. Our skilled barbers combine time-honored
-            techniques with contemporary styles to deliver the perfect cut every
-            time.
+            Bem-vindo à CCM Barbershop, onde tradição e modernidade se encontram
+            para oferecer a melhor experiência em cuidados masculinos. Nossa
+            barbearia combina técnicas clássicas de barbear com tendências
+            contemporâneas, proporcionando um ambiente acolhedor e profissional.
           </p>
         </div>
         <Link
           to={"/book"}
           className="bg-primary text-white px-6 py-3 rounded-md font-semibold"
         >
-          Book Appointment
+          Agendar Horário
         </Link>
       </div>
 
@@ -99,18 +99,18 @@ export function BarbershopProfile() {
         {/* Info Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Contact Information</CardTitle>
+            <CardTitle>Informações de Contato</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Address */}
             <div className="flex items-start gap-3">
               <MapPin className="w-5 h-5 text-muted-foreground mt-1" />
               <div>
-                <h3 className="font-semibold">Address</h3>
+                <h3 className="font-semibold">Endereço</h3>
                 <p className="text-muted-foreground">
-                  123 Main Street
+                  Rua das Flores, 123
                   <br />
-                  New York, NY 10001
+                  Uberlândia, MG 38400-000
                 </p>
               </div>
             </div>
@@ -119,13 +119,13 @@ export function BarbershopProfile() {
             <div className="flex items-start gap-3">
               <Clock className="w-5 h-5 text-muted-foreground mt-1" />
               <div>
-                <h3 className="font-semibold">Opening Hours</h3>
+                <h3 className="font-semibold">Horários de Funcionamento</h3>
                 <p className="text-muted-foreground">
-                  Monday - Friday: 9:00 AM - 8:00 PM
+                  Segunda - Sexta: 9:00 - 18:00
                   <br />
-                  Saturday: 10:00 AM - 6:00 PM
+                  Sábado: 9:00 - 13:00
                   <br />
-                  Sunday: Closed
+                  Domingo: Fechado
                 </p>
               </div>
             </div>
@@ -134,9 +134,9 @@ export function BarbershopProfile() {
             <div className="flex items-start gap-3">
               <CreditCard className="w-5 h-5 text-muted-foreground mt-1" />
               <div>
-                <h3 className="font-semibold">Payment Methods</h3>
+                <h3 className="font-semibold">Métodos de Pagamento</h3>
                 <p className="text-muted-foreground">
-                  Credit Card, Debit Card, Cash
+                  Cartão de Crédito, Cartão de Débito, Dinheiro
                 </p>
               </div>
             </div>
@@ -145,9 +145,9 @@ export function BarbershopProfile() {
             <div className="flex items-start gap-3">
               <Phone className="w-5 h-5 text-muted-foreground mt-1" />
               <div>
-                <h3 className="font-semibold">Contact</h3>
+                <h3 className="font-semibold">Contato</h3>
                 <div className="space-y-2">
-                  <p className="text-muted-foreground">+1 (555) 123-4567</p>
+                  <p className="text-muted-foreground">+55 (34) 99999-9999</p>
                   <div className="flex gap-4">
                     <a
                       href="#"

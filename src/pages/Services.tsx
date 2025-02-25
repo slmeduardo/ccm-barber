@@ -106,7 +106,7 @@ const Services = () => {
                 className="w-full bg-primary hover:bg-primary-hover"
               >
                 <Link to="/book">
-                  Book Now
+                  Agendar Horário
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>

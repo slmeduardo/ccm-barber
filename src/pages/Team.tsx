@@ -86,7 +86,7 @@ const Team = () => {
                 className="w-full bg-primary hover:bg-primary-hover mt-5"
               >
                 <Link to="/book">
-                  Book with {member.employee_name.split(" ")[0]}
+                  Agendar com {member.employee_name.split(" ")[0]}
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
