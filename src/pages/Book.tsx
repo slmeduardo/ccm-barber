@@ -180,9 +180,7 @@ const Book = () => {
   return (
     <div className="animate-fade-in max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="text-center mb-12">
-        <h1 className="font-display text-4xl font-bold text-gray-200 mb-4">
-          Agendamento
-        </h1>
+        <h1 className="text-4xl font-bold text-gray-200 mb-4">Agendamento</h1>
         <p className="text-xl text-gray-400">Agende seu horário conosco</p>
       </div>
 

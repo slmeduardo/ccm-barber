@@ -8,80 +8,125 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { auth } from "@/lib/firebase";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useAuth } from "@/contexts/AuthContext";
+import { db } from "@/lib/firebase";
+import { cn } from "@/lib/utils";
+import { webuser } from "@/types/webuser";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
 import * as z from "zod";
 
 const formSchema = z.object({
-  email: z.string().email("Email inválido"),
+  phone: z.string().min(10, "Telefone deve ter pelo menos 10 caracteres"),
   password: z.string().min(1, "A senha é obrigatória"),
 });
 
-export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
+export function LoginForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: "",
+      phone: "",
       password: "",
     },
   });
 
+  const [countryCode, setCountryCode] = useState<string>("+55");
+  const [phone, setPhone] = useState<string>("");
+  const [isValidPhone, setIsValidPhone] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  const validatePhone = (phoneNumber: string) => {
+    // Remove todos os caracteres não numéricos
+    const numbers = phoneNumber.replace(/\D/g, "");
+    // Verifica se tem 10 (fixo) ou 11 (celular) dígitos
+    const isValid = numbers.length >= 10 && numbers.length <= 11;
+    setIsValidPhone(isValid);
+    return isValid;
+  };
+
+  const handlePhoneChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+    field: {
+      onChange: (value: string) => void;
+      value: string;
+    }
+  ) => {
+    let value = event.target.value.replace(/\D/g, "");
+
+    if (value.length <= 11) {
+      // Aplica a máscara
+      if (value.length > 2) {
+        value = value.replace(/^(\d{2})(\d)/g, "($1) $2");
+      }
+      if (value.length > 7) {
+        value = value.replace(/(\d)(\d{4})$/, "$1-$2");
+      }
+      event.target.value = value;
+
+      setPhone(value);
+      // Valida o número a cada mudança
+      validatePhone(value);
+      // Atualiza o valor no formulário
+      field.onChange(value);
+    }
+  };
+
+  const formatPhoneForDatabase = (phone: string, countryCode: string) => {
+    const cleanNumber = countryCode.replace("+", "") + phone.replace(/\D/g, "");
+    return `${cleanNumber}@s.whatsapp.net`;
+  };
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        values.email,
-        values.password
-      );
+      setIsSubmitting(true);
 
-      console.log("Usuário logado:", {
-        uid: userCredential.user.uid,
-        email: userCredential.user.email,
-        name: userCredential.user.displayName,
-        emailVerified: userCredential.user.emailVerified,
-      });
+      const formattedPhone = formatPhoneForDatabase(values.phone, countryCode);
 
-      onSuccess?.();
-    } catch (error: any) {
-      const errorMessage = "Ocorreu um erro ao fazer login.";
+      // Buscar usuário pelo número de telefone
+      const usersRef = collection(db, "webUsers");
+      const q = query(usersRef, where("phone", "==", formattedPhone));
+      const querySnapshot = await getDocs(q);
 
-      switch (error.code) {
-        case "auth/invalid-email":
-          form.setError("email", { message: "O formato do email é inválido." });
-          break;
-        case "auth/user-disabled":
-          form.setError("email", { message: "Esta conta foi desativada." });
-          break;
-        case "auth/user-not-found":
-          form.setError("email", {
-            message:
-              "Email não encontrado. Por favor, verifique suas credenciais.",
-          });
-          break;
-        case "auth/wrong-password":
-          form.setError("password", {
-            message: "Senha incorreta. Por favor, tente novamente.",
-          });
-          break;
-        case "auth/too-many-requests":
-          form.setError("root", {
-            message:
-              "Muitas tentativas de login. Por favor, tente novamente mais tarde.",
-          });
-          break;
-        case "auth/network-request-failed":
-          form.setError("root", {
-            message: "Erro de conexão. Verifique sua internet.",
-          });
-          break;
-        default:
-          console.error("Erro ao fazer login:", error);
-          form.setError("root", {
-            message: "Ocorreu um erro ao fazer login. Tente novamente.",
-          });
+      if (querySnapshot.empty) {
+        throw new Error("Usuário não encontrado");
       }
+
+      const userDoc = querySnapshot.docs[0];
+      const userData = userDoc.data() as webuser;
+
+      // Verificar a senha
+      if (userData.password !== values.password) {
+        throw new Error("Senha incorreta");
+      }
+
+      // Login bem-sucedido
+      login(userData);
+      navigate("/");
+    } catch (error) {
+      if (error instanceof Error) {
+        form.setError("root", {
+          message: error.message,
+        });
+      } else {
+        form.setError("root", {
+          message: "Ocorreu um erro ao fazer login. Tente novamente.",
+        });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -90,16 +135,36 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField
           control={form.control}
-          name="email"
+          name="phone"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email</FormLabel>
+              <FormLabel>Telefone</FormLabel>
               <FormControl>
-                <Input
-                  placeholder="email@example.com"
-                  {...field}
-                  type="email"
-                />
+                <div className="flex">
+                  <Select value={countryCode} onValueChange={setCountryCode}>
+                    <SelectTrigger className="w-[100px] rounded-r-none">
+                      <SelectValue placeholder="País" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="+55">🇧🇷 +55</SelectItem>
+                      <SelectItem value="+1">🇺🇸 +1</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Input
+                    placeholder="(00) 00000-0000"
+                    value={phone}
+                    onChange={(e) => handlePhoneChange(e, field)}
+                    maxLength={15}
+                    className={cn(
+                      "flex-1 rounded-l-none border-l-0",
+                      phone &&
+                        !isValidPhone &&
+                        "border-red-500 focus-visible:ring-red-500"
+                    )}
+                    {...field}
+                  />
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -123,8 +188,12 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
             {form.formState.errors.root.message}
           </div>
         )}
-        <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
-          Entrar
+        <Button
+          type="submit"
+          className="w-full bg-primary hover:bg-primary/90"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "Entrando..." : "Entrar"}
         </Button>
       </form>
     </Form>

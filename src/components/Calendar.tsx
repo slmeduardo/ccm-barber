@@ -33,6 +33,7 @@ import { collection, doc, getDocs, updateDoc } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Label } from "./ui/label";
+import { Skeleton } from "./ui/skeleton";
 
 interface DayTime {
   appointment_id?: string;
@@ -344,10 +345,16 @@ const Calendar = () => {
     setIsEventDialogOpen(true);
   };
 
-  if (loading) {
-    return <div>Carregando...</div>;
+  if (loading || loadingServices) {
+    return (
+      <>
+        <div className="my-15">
+          <Skeleton className="w-52 h-10" />
+        </div>
+        <Skeleton className="w-full h-screen" />
+      </>
+    );
   }
-
   const renderEventContent = (eventInfo) => {
     const isDayOff = eventInfo.event.extendedProps.service === "day_off";
     const isOutOfOffice =
@@ -650,14 +657,16 @@ const Calendar = () => {
 
                   // Remove duplicate events based on appointment_id
                   const uniqueEvents = validEvents
-                    ? Array.from(
-                        new Map(
-                          validEvents.map((event) => [
-                            event.appointment_id,
-                            event,
-                          ])
-                        ).values()
-                      )
+                    ? validEvents.reduce((acc, event) => {
+                        if (
+                          !acc.some(
+                            (e) => e.appointment_id === event.appointment_id
+                          )
+                        ) {
+                          acc.push(event);
+                        }
+                        return acc;
+                      }, [])
                     : [];
 
                   if (!uniqueEvents.length) {

@@ -30,7 +30,7 @@ export function AuthPage() {
       {/* Lado Esquerdo - Imagem e Informações */}
       <div className="hidden lg:flex lg:w-1/2 bg-primary p-12 text-white flex-col justify-between">
         <div>
-          <h1 className="text-4xl font-bold mb-4">Barbearia Vitti</h1>
+          <h1 className="text-4xl font-bold mb-4">Barbearia CCM</h1>
           <p className="text-xl mb-8">
             O melhor em cuidados masculinos e estilo para você.
           </p>

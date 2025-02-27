@@ -55,7 +55,7 @@ export function BarbershopProfile() {
         </div>
         <Link
           to={"/book"}
-          className="bg-primary text-white px-6 py-3 rounded-md font-semibold"
+          className="bg-primary text-white px-6 py-2 rounded-md font-semibold"
         >
           Agendar Horário
         </Link>

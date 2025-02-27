@@ -1,8 +1,9 @@
 export interface webuser {
   user_id: string;
-  email: string;
   name: string;
   phone: string;
+  email: string;
+  password: string;
   isAdmin: boolean;
   createdAt?: string;
 }

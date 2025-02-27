@@ -28,6 +28,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -541,18 +542,22 @@ const Management = () => {
   };
 
   if (loading || loadingServices || initialLoading) {
-    return <div>Carregando...</div>;
+    return (
+      <>
+        <div className="flex justify-center items-center my-20 gap-4">
+          <Skeleton className="w-16 h-5" />
+          <Skeleton className="w-16 h-5" />
+          <Skeleton className="w-16 h-5" />
+          <Skeleton className="w-16 h-5" />
+        </div>
+        <Skeleton className="w-full h-screen" />
+      </>
+    );
   }
 
   return (
     <>
       <div className="container mx-auto px-4 py-8">
-        <div className="text-center mb-12">
-          <h1 className="font-display text-4xl font-bold text-gray-200 mb-4">
-            Gerenciamento
-          </h1>
-        </div>
-
         <Tabs defaultValue="schedule" className="w-full">
           <TabsList className="flex justify-center w-full h-16 bg-transparent mb-8">
             <TabsTrigger value="schedule">Horários</TabsTrigger>
@@ -604,7 +609,7 @@ const Management = () => {
               <button
                 onClick={handleSubmit}
                 disabled={isUpdating}
-                className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isUpdating ? (
                   <span className="flex items-center gap-2">
@@ -626,7 +631,7 @@ const Management = () => {
                 onOpenChange={handleServiceDialogChange}
               >
                 <DialogTrigger asChild>
-                  <Button>
+                  <Button size="sm">
                     <Plus className="mr-2 h-4 w-4" />
                     Novo Serviço
                   </Button>
@@ -791,7 +796,7 @@ const Management = () => {
                 onOpenChange={handleEmployeeDialogChange}
               >
                 <DialogTrigger asChild>
-                  <Button>
+                  <Button size="sm">
                     <Plus className="mr-2 h-4 w-4" />
                     Novo Funcionário
                   </Button>

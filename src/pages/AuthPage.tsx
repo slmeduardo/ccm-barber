@@ -1,25 +1,19 @@
 import { LoginForm } from "@/components/auth/LoginForm";
 import { SignUpForm } from "@/components/auth/SignUpForm";
-import { auth } from "@/lib/firebase";
-import { User, onAuthStateChanged } from "firebase/auth";
+import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export function AuthPage() {
   const [isLoginForm, setIsLoginForm] = useState(true);
-  const [user, setUser] = useState<User | null>(null);
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      if (user) {
-        navigate("/");
-      }
-    });
-
-    return () => unsubscribe();
-  }, [navigate]);
+    if (user) {
+      navigate("/");
+    }
+  }, [user, navigate]);
 
   if (user) {
     return null; // Usuário será redirecionado pelo useEffect
@@ -28,9 +22,9 @@ export function AuthPage() {
   return (
     <div className="min-h-screen flex">
       {/* Lado Esquerdo - Imagem e Informações */}
-      <div className="hidden lg:flex lg:w-1/2 bg-primary p-12 text-white flex-col justify-between">
+      <div className=" bg-primary w-1/2 p-12 text-white flex-col justify-between">
         <div>
-          <h1 className="text-4xl font-bold mb-4">Barbearia Vitti</h1>
+          <h1 className="text-4xl font-bold mb-4">Barbearia CCM</h1>
           <p className="text-xl mb-8">
             O melhor em cuidados masculinos e estilo para você.
           </p>
@@ -88,7 +82,7 @@ export function AuthPage() {
 
           {isLoginForm ? (
             <>
-              <LoginForm onSuccess={() => navigate("/")} />
+              <LoginForm />
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">
                   Ainda não tem uma conta?{" "}
@@ -103,7 +97,7 @@ export function AuthPage() {
             </>
           ) : (
             <>
-              <SignUpForm onSuccess={() => navigate("/")} />
+              <SignUpForm onSuccess={() => setIsLoginForm(true)} />
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">
                   Já tem uma conta?{" "}

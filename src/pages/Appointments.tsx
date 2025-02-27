@@ -7,8 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { db } from "@/config/firebaseConfig";
-import { useAuth } from "@/hooks/useAuth";
-import { useWebUsers } from "@/hooks/useFirestore";
+import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { collection, getDocs, writeBatch } from "firebase/firestore";
@@ -46,27 +45,26 @@ export function Appointments() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
-  const { user: authUser } = useAuth();
-  const { webUsers } = useWebUsers();
-  const webUser = webUsers.find((user) => user.user_id === authUser?.uid);
+
+  const { user } = useAuth();
 
   useEffect(() => {
-    if (webUser?.phone) {
+    if (user?.phone) {
       handleSearch();
     }
-  }, [webUser]);
+  }, [user]);
 
   const formatPhoneForDatabase = (phone: string) => {
     return phone;
   };
 
   const handleSearch = async () => {
-    if (!webUser?.phone) {
+    if (!user?.phone) {
       return;
     }
 
     setLoading(true);
-    const formattedPhone = formatPhoneForDatabase(webUser.phone);
+    const formattedPhone = formatPhoneForDatabase(user.phone);
     const foundAppointments: Appointment[] = [];
     const seenAppointmentIds = new Set();
 
@@ -161,7 +159,7 @@ export function Appointments() {
   return (
     <div className="animate-fade-in max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="text-center mb-12">
-        <h1 className="font-display text-4xl font-bold text-gray-200 mb-4">
+        <h1 className="text-4xl font-bold text-gray-200 mb-4">
           Meus Agendamentos
         </h1>
         <p className="text-xl text-gray-400">
