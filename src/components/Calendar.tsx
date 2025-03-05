@@ -21,6 +21,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { db } from "@/config/firebaseConfig";
 import { cn } from "@/lib/utils";
 import { Service } from "@/pages/Services";
@@ -327,15 +333,18 @@ const Calendar = () => {
       ];
     });
 
-    // Filtrar eventos duplicados mantendo apenas a primeira ocorrência de cada ID
-    const uniqueEvents = calendarEvents.reduce((acc, current) => {
-      const x = acc.find((item) => item.id === current.id);
-      if (!x) {
-        return acc.concat([current]);
-      } else {
-        return acc;
-      }
-    }, [] as typeof calendarEvents);
+    // Correção do problema de tipo no reduce
+    const uniqueEvents = calendarEvents.reduce<typeof calendarEvents>(
+      (acc, current) => {
+        const x = acc.find((item) => item.id === current.id);
+        if (!x) {
+          return acc.concat([current]);
+        } else {
+          return acc;
+        }
+      },
+      []
+    );
 
     setEvents(uniqueEvents);
   }, [selectedEmployee, employeesData, services]);
@@ -359,8 +368,12 @@ const Calendar = () => {
     const isDayOff = eventInfo.event.extendedProps.service === "day_off";
     const isOutOfOffice =
       eventInfo.event.extendedProps.service === "out_of_office";
+    const isListView = ["timeGridWeek", "timeGridDay"].includes(
+      eventInfo.view.type
+    );
+    const isMonthView = eventInfo.view.type === "dayGridMonth";
 
-    return (
+    const eventContent = (
       <div
         className={`cursor-pointer w-full h-full p-2 rounded ${
           isDayOff
@@ -371,19 +384,64 @@ const Calendar = () => {
         }`}
       >
         {isDayOff ? (
-          <strong>Dia de Folga</strong>
+          <strong>{isMonthView ? "Dia de Folga" : ""}</strong>
         ) : isOutOfOffice ? (
-          <strong>Horário Indisponível</strong>
+          <strong>{isMonthView ? "Horário Indisponível" : ""}</strong>
         ) : (
           <>
             {eventInfo.event.extendedProps.hour && (
               <p>{eventInfo.event.extendedProps.hour}</p>
             )}
-            <strong>{eventInfo.event.extendedProps.service}</strong>
+            {isMonthView && false && (
+              <strong>{eventInfo.event.extendedProps.service}</strong>
+            )}
           </>
         )}
       </div>
     );
+
+    // Aplicar o tooltip apenas nas visualizações de semana e dia
+    if (isListView) {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>{eventContent}</TooltipTrigger>
+            <TooltipContent>
+              {isDayOff ? (
+                <p>Dia de Folga</p>
+              ) : isOutOfOffice ? (
+                <p>
+                  Horário Indisponível:{" "}
+                  {eventInfo.event.extendedProps.startHour} às{" "}
+                  {eventInfo.event.extendedProps.endHour}
+                </p>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  <p>
+                    <strong>Serviço:</strong>{" "}
+                    {eventInfo.event.extendedProps.service}
+                  </p>
+                  {eventInfo.event.extendedProps.hour && (
+                    <p>
+                      <strong>Horário:</strong>{" "}
+                      {eventInfo.event.extendedProps.hour}
+                    </p>
+                  )}
+                  {eventInfo.event.extendedProps.client_id && (
+                    <p>
+                      <strong>Cliente:</strong>{" "}
+                      {eventInfo.event.extendedProps.client_id}
+                    </p>
+                  )}
+                </div>
+              )}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    return eventContent;
   };
 
   const handleDateClick = async (info) => {
@@ -713,7 +771,20 @@ const Calendar = () => {
       <EventDetailsDialog
         isOpen={isEventDialogOpen}
         onOpenChange={setIsEventDialogOpen}
-        event={selectedEvent}
+        event={
+          selectedEvent
+            ? {
+                title: selectedEvent.title,
+                extendedProps: {
+                  service: selectedEvent.extendedProps.service || "",
+                  hour: selectedEvent.extendedProps.hour,
+                  client_id: selectedEvent.extendedProps.client_id,
+                  startHour: selectedEvent.extendedProps.startHour,
+                  endHour: selectedEvent.extendedProps.endHour,
+                },
+              }
+            : null
+        }
       />
 
       <FullCalendar

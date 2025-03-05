@@ -28,6 +28,7 @@ import { db } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
 import { webuser } from "@/types/webuser";
 import { zodResolver } from "@hookform/resolvers/zod";
+import bcrypt from "bcryptjs";
 import {
   collection,
   getDocs,
@@ -105,13 +106,14 @@ export function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
   };
 
   const handlePhoneChange = async (
-    event: React.ChangeEvent<HTMLInputElement>,
+    event: React.FormEvent<HTMLInputElement>,
     field: {
       onChange: (value: string) => void;
       value: string;
     }
   ) => {
-    let value = event.target.value.replace(/\D/g, "");
+    const target = event.target as HTMLInputElement;
+    let value = target.value.replace(/\D/g, "");
 
     if (value.length <= 11) {
       if (value.length > 2) {
@@ -120,7 +122,7 @@ export function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
       if (value.length > 7) {
         value = value.replace(/(\d)(\d{4})$/, "$1-$2");
       }
-      event.target.value = value;
+      target.value = value;
 
       setPhone(value);
       validatePhone(value);
@@ -159,6 +161,10 @@ export function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
 
       const formattedPhone = formatPhoneForDatabase(values.phone, countryCode);
 
+      // Gera um hash da senha
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(values.password, salt);
+
       if (existingUser) {
         // Atualiza o usuário existente
         const usersRef = collection(db, "webUsers");
@@ -174,7 +180,7 @@ export function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
           await updateDoc(userDoc.ref, {
             user_id: userId,
             email: values.email,
-            password: values.password,
+            password: hashedPassword, // Uso da senha criptografada
             isAdmin: false,
           });
 
@@ -195,7 +201,7 @@ export function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
           name: values.name,
           email: values.email,
           phone: formattedPhone,
-          password: values.password,
+          password: hashedPassword, // Uso da senha criptografada
           isAdmin: false,
         };
 
@@ -283,7 +289,9 @@ export function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
                         <Input
                           placeholder="(00) 00000-0000"
                           value={phone}
-                          onChangeCapture={(e) => handlePhoneChange(e, field)}
+                          onChangeCapture={(event) =>
+                            handlePhoneChange(event, field)
+                          }
                           maxLength={15}
                           className={cn(
                             "flex-1 rounded-l-none border-l-0",

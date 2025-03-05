@@ -6,10 +6,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/contexts/AuthContext";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { Calendar, Home, LayoutDashboard, User } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 interface ProfileMenuProps {
   userName: string;
@@ -18,11 +19,18 @@ interface ProfileMenuProps {
 
 export function ProfileMenu({ userName, isAdmin = false }: ProfileMenuProps) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const isDashboard = location.pathname.includes("/dashboard");
 
   const handleLogout = async () => {
     try {
+      // Fazer logout no Firebase
       await signOut(auth);
+      // Fazer logout no contexto de autenticação
+      logout();
+      // Redirecionar para a página de autenticação
+      navigate("/auth");
     } catch (error) {
       console.error("Erro ao fazer logout:", error);
     }

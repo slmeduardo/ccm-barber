@@ -70,6 +70,19 @@ type Employee = {
   services: string[];
 };
 
+// Definindo tipos para os objetos de calendário
+type DayTimeSlot = {
+  appointment_id: string;
+  client_id: string;
+  hour: string;
+  service: string;
+};
+
+type CalendarDay = {
+  day: string;
+  day_time: DayTimeSlot[];
+};
+
 const serviceFormSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
   description: z.string().min(2, "Descrição deve ter pelo menos 2 caracteres"),
@@ -104,6 +117,8 @@ const Management = () => {
     null
   );
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+
+  console.log("webUser", webUsers);
 
   // Formulários
   const serviceForm = useForm<z.infer<typeof serviceFormSchema>>({
@@ -149,6 +164,7 @@ const Management = () => {
     "16:00",
     "17:00",
     "18:00",
+    "19:00",
   ];
 
   // Função para carregar o estado inicial dos checkboxes do Firestore
@@ -164,12 +180,12 @@ const Management = () => {
         if (employeeDoc.exists()) {
           const calendarData = employeeDoc.data();
 
-          calendarData.calendar.forEach((dayObj: any) => {
+          calendarData.calendar.forEach((dayObj: CalendarDay) => {
             const date = new Date(dayObj.day);
             const dayOfWeek = date.getDay();
             const weekDay = weekDays[dayOfWeek];
 
-            dayObj.day_time.forEach((timeSlot: any) => {
+            dayObj.day_time.forEach((timeSlot: DayTimeSlot) => {
               const baseHour = timeSlot.hour.split(":")[0].padStart(2, "0");
               const key = `${weekDay}-${baseHour}:00`;
 
@@ -189,7 +205,7 @@ const Management = () => {
     }
   };
 
-  // Carrega os estados iniciais quando o componente montar e employees estiver disponível
+  // Corrigindo o useEffect condicional
   useEffect(() => {
     if (employees.length > 0 && !loading) {
       loadInitialCheckboxStates();
@@ -216,46 +232,48 @@ const Management = () => {
           if (!employeeDoc.exists()) continue;
 
           const existingData = employeeDoc.data();
-          const updatedCalendar = existingData.calendar.map((dayObj: any) => {
-            const date = new Date(dayObj.day);
-            const dayOfWeek = date.getDay();
-            const weekDay = weekDays[dayOfWeek];
+          const updatedCalendar = existingData.calendar.map(
+            (dayObj: CalendarDay) => {
+              const date = new Date(dayObj.day);
+              const dayOfWeek = date.getDay();
+              const weekDay = weekDays[dayOfWeek];
 
-            if (weekDay !== day) return dayObj;
+              if (weekDay !== day) return dayObj;
 
-            return {
-              ...dayObj,
-              day_time: dayObj.day_time.map((timeSlot: any) => {
-                if (
-                  timeSlot.appointment_id !== "" &&
-                  timeSlot.appointment_id !== "not_in_schedule"
-                ) {
+              return {
+                ...dayObj,
+                day_time: dayObj.day_time.map((timeSlot: DayTimeSlot) => {
+                  if (
+                    timeSlot.appointment_id !== "" &&
+                    timeSlot.appointment_id !== "not_in_schedule"
+                  ) {
+                    return timeSlot;
+                  }
+
+                  const slotBaseHour = timeSlot.hour
+                    .split(":")[0]
+                    .padStart(2, "0");
+                  if (slotBaseHour === baseHour) {
+                    return !checkboxStates[key]
+                      ? {
+                          appointment_id: "not_in_schedule",
+                          client_id: "not_in_schedule",
+                          hour: timeSlot.hour,
+                          service: "not_in_schedule",
+                        }
+                      : {
+                          appointment_id: "",
+                          client_id: "none",
+                          hour: timeSlot.hour,
+                          service: "none",
+                        };
+                  }
+
                   return timeSlot;
-                }
-
-                const slotBaseHour = timeSlot.hour
-                  .split(":")[0]
-                  .padStart(2, "0");
-                if (slotBaseHour === baseHour) {
-                  return !checkboxStates[key]
-                    ? {
-                        appointment_id: "not_in_schedule",
-                        client_id: "not_in_schedule",
-                        hour: timeSlot.hour,
-                        service: "not_in_schedule",
-                      }
-                    : {
-                        appointment_id: "",
-                        client_id: "none",
-                        hour: timeSlot.hour,
-                        service: "none",
-                      };
-                }
-
-                return timeSlot;
-              }),
-            };
-          });
+                }),
+              };
+            }
+          );
 
           await updateDocument("calendar", employeeName, {
             ...existingData,
@@ -374,11 +392,27 @@ const Management = () => {
   // Funções para gerenciar equipe
   const handleDeleteEmployee = async (employeeId: string) => {
     try {
-      await deleteDocument("employees", employeeId);
-      toast({
-        title: "Sucesso!",
-        description: "Funcionário excluído com sucesso.",
-      });
+      // Obter o documento colaborador
+      const employeeDoc = await getDoc(doc(db, "employees", "colaborador"));
+
+      if (employeeDoc.exists()) {
+        const existingData = employeeDoc.data();
+        const existingEmployees = existingData.employees || [];
+
+        // Remover o funcionário do array
+        const updatedEmployees = existingEmployees.filter(
+          (emp: Employee) => emp.employee_id !== employeeId
+        );
+
+        await updateDocument("employees", "colaborador", {
+          employees: updatedEmployees,
+        });
+
+        toast({
+          title: "Sucesso!",
+          description: "Funcionário excluído com sucesso.",
+        });
+      }
     } catch (error) {
       toast({
         variant: "destructive",
@@ -441,9 +475,25 @@ const Management = () => {
         employee_id: data.employee_name,
         ...data,
       };
-      await updateDocument("employees", data.employee_name, {
-        employees: [newEmployee],
-      });
+
+      // Verificar se já existe o documento colaborador
+      const employeeDoc = await getDoc(doc(db, "employees", "colaborador"));
+
+      if (employeeDoc.exists()) {
+        // Se existir, adiciona o novo funcionário ao array existente
+        const existingData = employeeDoc.data();
+        const existingEmployees = existingData.employees || [];
+
+        await updateDocument("employees", "colaborador", {
+          employees: [...existingEmployees, newEmployee],
+        });
+      } else {
+        // Se não existir, cria o documento com o novo funcionário
+        await updateDocument("employees", "colaborador", {
+          employees: [newEmployee],
+        });
+      }
+
       toast({
         title: "Sucesso!",
         description: "Funcionário criado com sucesso.",
@@ -467,14 +517,31 @@ const Management = () => {
         employee_id: editingEmployee.employee_id,
         ...data,
       };
-      await updateDocument("employees", editingEmployee.employee_id, {
-        employees: [updatedEmployee],
-      });
-      toast({
-        title: "Sucesso!",
-        description: "Funcionário atualizado com sucesso.",
-      });
-      handleEmployeeDialogChange(false);
+
+      // Obter o documento colaborador
+      const employeeDoc = await getDoc(doc(db, "employees", "colaborador"));
+
+      if (employeeDoc.exists()) {
+        const existingData = employeeDoc.data();
+        const existingEmployees = existingData.employees || [];
+
+        // Atualizar o funcionário específico no array
+        const updatedEmployees = existingEmployees.map((emp: Employee) =>
+          emp.employee_id === updatedEmployee.employee_id
+            ? updatedEmployee
+            : emp
+        );
+
+        await updateDocument("employees", "colaborador", {
+          employees: updatedEmployees,
+        });
+
+        toast({
+          title: "Sucesso!",
+          description: "Funcionário atualizado com sucesso.",
+        });
+        handleEmployeeDialogChange(false);
+      }
     } catch (error) {
       toast({
         variant: "destructive",
@@ -484,32 +551,44 @@ const Management = () => {
     }
   };
 
-  // Efeitos para carregar dados
+  // Corrigindo o useEffect condicional para carregar dados
   useEffect(() => {
-    if (employees.length > 0) {
-      setTeam(employees[0]?.employees || []);
-    }
+    const loadTeam = () => {
+      if (employees.length > 0) {
+        setTeam(employees[0]?.employees || []);
+      }
+    };
+
+    loadTeam();
   }, [employees]);
 
-  // Efeitos para os formulários
+  // Corrigindo o useEffect condicional para os formulários
   useEffect(() => {
-    if (editingService) {
-      serviceForm.reset({
-        name: editingService.name,
-        description: editingService.description,
-        preco: editingService.preco,
-        service_duration: editingService.service_duration,
-      });
-    }
+    const resetServiceForm = () => {
+      if (editingService) {
+        serviceForm.reset({
+          name: editingService.name,
+          description: editingService.description,
+          preco: editingService.preco,
+          service_duration: editingService.service_duration,
+        });
+      }
+    };
+
+    resetServiceForm();
   }, [editingService]);
 
   useEffect(() => {
-    if (editingEmployee) {
-      employeeForm.reset({
-        employee_name: editingEmployee.employee_name,
-        services: editingEmployee.services,
-      });
-    }
+    const resetEmployeeForm = () => {
+      if (editingEmployee) {
+        employeeForm.reset({
+          employee_name: editingEmployee.employee_name,
+          services: editingEmployee.services,
+        });
+      }
+    };
+
+    resetEmployeeForm();
   }, [editingEmployee]);
 
   // Funções para gerenciar os diálogos
@@ -595,7 +674,7 @@ const Management = () => {
                             }
                             onChange={() => handleCheckboxChange(day, time)}
                             type="checkbox"
-                            className="h-6 w-6 rounded border-border"
+                            className="w-4 h-4 rounded border-border"
                           />
                         </TableCell>
                       ))}

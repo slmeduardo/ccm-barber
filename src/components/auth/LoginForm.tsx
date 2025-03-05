@@ -15,11 +15,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
 import { webuser } from "@/types/webuser";
 import { zodResolver } from "@hookform/resolvers/zod";
+import bcrypt from "bcryptjs";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -31,7 +33,7 @@ const formSchema = z.object({
   password: z.string().min(1, "A senha é obrigatória"),
 });
 
-export function LoginForm() {
+export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -58,13 +60,14 @@ export function LoginForm() {
   };
 
   const handlePhoneChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
+    event: React.FormEvent<HTMLInputElement>,
     field: {
       onChange: (value: string) => void;
       value: string;
     }
   ) => {
-    let value = event.target.value.replace(/\D/g, "");
+    const target = event.target as HTMLInputElement;
+    let value = target.value.replace(/\D/g, "");
 
     if (value.length <= 11) {
       // Aplica a máscara
@@ -74,7 +77,7 @@ export function LoginForm() {
       if (value.length > 7) {
         value = value.replace(/(\d)(\d{4})$/, "$1-$2");
       }
-      event.target.value = value;
+      target.value = value;
 
       setPhone(value);
       // Valida o número a cada mudança
@@ -89,46 +92,72 @@ export function LoginForm() {
     return `${cleanNumber}@s.whatsapp.net`;
   };
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       setIsSubmitting(true);
 
+      // Formata o telefone para buscar no banco de dados
       const formattedPhone = formatPhoneForDatabase(values.phone, countryCode);
 
-      // Buscar usuário pelo número de telefone
+      // Busca o usuário pelo telefone
       const usersRef = collection(db, "webUsers");
       const q = query(usersRef, where("phone", "==", formattedPhone));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        throw new Error("Usuário não encontrado");
+        throw new Error("Telefone ou senha incorretos");
       }
 
       const userDoc = querySnapshot.docs[0];
       const userData = userDoc.data() as webuser;
 
-      // Verificar a senha
-      if (userData.password !== values.password) {
-        throw new Error("Senha incorreta");
+      // Compara a senha fornecida com o hash armazenado
+      const isPasswordValid = await bcrypt.compare(
+        values.password,
+        userData.password
+      );
+
+      if (!isPasswordValid) {
+        throw new Error("Telefone ou senha incorretos");
       }
 
-      // Login bem-sucedido
-      login(userData);
-      navigate("/");
+      // Se chegou aqui, a senha está correta
+      // Salve os dados do usuário na sessão, local storage, ou context
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          user_id: userData.user_id,
+          name: userData.name,
+          email: userData.email,
+          isAdmin: userData.isAdmin,
+        })
+      );
+
+      // Login bem-sucedido - use a função login do contexto, se disponível
+      login?.(userData);
+
+      toast({
+        title: "Login realizado com sucesso!",
+        description: `Bem-vindo(a) de volta, ${userData.name}!`,
+      });
+
+      // Redireciona ou executa alguma função após o login
+      onSuccess?.();
+
+      // Navegue para a página apropriada
+      userData.isAdmin ? navigate("/dashboard") : navigate("/");
     } catch (error) {
-      if (error instanceof Error) {
-        form.setError("root", {
-          message: error.message,
-        });
-      } else {
-        form.setError("root", {
-          message: "Ocorreu um erro ao fazer login. Tente novamente.",
-        });
-      }
+      console.error("Erro no login:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description:
+          error instanceof Error ? error.message : "Erro ao fazer login",
+      });
     } finally {
       setIsSubmitting(false);
     }
-  }
+  };
 
   return (
     <Form {...form}>
@@ -154,7 +183,7 @@ export function LoginForm() {
                   <Input
                     placeholder="(00) 00000-0000"
                     value={phone}
-                    onChange={(e) => handlePhoneChange(e, field)}
+                    onChangeCapture={(e) => handlePhoneChange(e, field)}
                     maxLength={15}
                     className={cn(
                       "flex-1 rounded-l-none border-l-0",

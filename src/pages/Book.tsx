@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
@@ -14,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { db } from "@/config/firebaseConfig";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   useEmployeeCalendar,
   useEmployees,
@@ -31,9 +31,7 @@ const Book = () => {
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [selectedService, setSelectedService] = useState<string>("");
   const [selectedEmployee, setSelectedEmployee] = useState<string>("");
-  const [phone, setPhone] = useState<string>("");
-  const [isValidPhone, setIsValidPhone] = useState<boolean>(false);
-  const [countryCode, setCountryCode] = useState<string>("+55");
+  const { user: authUser } = useAuth();
 
   const { services, loading: loadingServices } = useServices();
   const { employees, loading: loadingEmployees } = useEmployees();
@@ -52,34 +50,32 @@ const Book = () => {
     );
   };
 
-  const validatePhone = (phoneNumber: string) => {
-    // Remove todos os caracteres não numéricos
-    const numbers = phoneNumber.replace(/\D/g, "");
-    // Verifica se tem 10 (fixo) ou 11 (celular) dígitos
-    const isValid = numbers.length === 10 || numbers.length === 11;
-    setIsValidPhone(isValid);
-    return isValid;
-  };
-
-  const handlePhoneChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    let value = event.target.value.replace(/\D/g, "");
-
-    if (value.length <= 11) {
-      value = value.replace(/^(\d{2})(\d)/g, "($1) $2");
-      value = value.replace(/(\d)(\d{4})$/, "$1-$2");
-      setPhone(value);
-      setIsValidPhone(true);
+  const formatPhoneForDatabase = (phone: string) => {
+    if (phone.includes("@s.whatsapp.net")) {
+      return phone;
     }
+    return `${phone.replace("+", "")}@s.whatsapp.net`;
   };
 
-  const handlePhoneBlur = () => {
-    validatePhone(phone);
-  };
+  function formatPhoneNumber(whatsappNumber: string) {
+    // Extract the numeric part before '@s.whatsapp.net'
+    const number = whatsappNumber.split("@")[0];
 
-  const formatPhoneForDatabase = (phone: string, countryCode: string) => {
-    const cleanNumber = countryCode.replace("+", "") + phone.replace(/\D/g, "");
-    return `${cleanNumber}@s.whatsapp.net`;
-  };
+    // Remove the country code (first 2 digits, assuming '55' for Brazil)
+    const withoutCountryCode = number.slice(2);
+
+    // Extract area code (next 2 digits)
+    const areaCode = withoutCountryCode.slice(0, 2);
+
+    // Extract the first part of the number (next 4 digits)
+    const firstPart = withoutCountryCode.slice(2, 6);
+
+    // Extract the second part of the number (last 4 digits)
+    const secondPart = withoutCountryCode.slice(6);
+
+    // Return the formatted number
+    return `(${areaCode}) ${firstPart}-${secondPart}`;
+  }
 
   useEffect(() => {
     setSelectedEmployee("");
@@ -87,7 +83,9 @@ const Book = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const formattedPhone = formatPhoneForDatabase(phone, countryCode);
+
+    const phoneNumber = authUser?.phone || "";
+    const formattedPhone = formatPhoneForDatabase(phoneNumber);
 
     try {
       const calendarRef = collection(db, "calendar");
@@ -112,13 +110,11 @@ const Book = () => {
         throw new Error("Data não encontrada");
       }
 
-      // Encontra o serviço selecionado para obter a duração
       const selectedServiceData = services.find(
         (service) => service.name === selectedService
       );
       const serviceDuration = selectedServiceData?.service_duration || 1;
 
-      // Encontra o índice do horário inicial
       const startTimeIndex = employeeData.calendar[dayIndex].day_time.findIndex(
         (time: { hour: string }) => time.hour.trim() === selectedTime
       );
@@ -127,7 +123,6 @@ const Book = () => {
         throw new Error("Horário não encontrado");
       }
 
-      // Atualiza todos os slots necessários para o serviço
       const updatedCalendar = [...employeeData.calendar];
       const appointmentId = generateUniqueId();
 
@@ -141,19 +136,16 @@ const Book = () => {
         }
       }
 
-      // Atualiza o documento no Firestore
       await updateDoc(doc(db, "calendar", employeeDoc.id), {
         calendar: updatedCalendar,
       });
 
       alert("Agendamento realizado com sucesso!");
 
-      // Limpa o formulário
       setDate(new Date());
       setSelectedTime("");
       setSelectedService("");
       setSelectedEmployee("");
-      setPhone("");
     } catch (error) {
       console.error("Erro ao realizar agendamento:", error);
       alert("Erro ao realizar agendamento. Por favor, tente novamente.");
@@ -161,9 +153,9 @@ const Book = () => {
   };
 
   const timeSlots = [];
-  const startHour = 9; // 9:00
-  const endHour = 19; // 19:00
-  const interval = 15; // 15 minutos
+  const startHour = 9;
+  const endHour = 19;
+  const interval = 15;
 
   for (let hour = startHour; hour <= endHour; hour++) {
     for (let minutes = 0; minutes < 60; minutes += interval) {
@@ -185,9 +177,9 @@ const Book = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
-        <div className="grid gap-6">
+        <div className="grid gap-6 grid-cols-2">
           <div className="flex gap-2">
-            <div className="flex flex-col space-y-2 w-1/2">
+            <div className="flex flex-col space-y-2 w-full">
               <label className="text-sm font-medium">
                 Data do Agendamento:
               </label>
@@ -224,42 +216,18 @@ const Book = () => {
                 </PopoverContent>
               </Popover>
             </div>
+          </div>
 
-            <div className="flex flex-col space-y-2 w-1/2">
-              <label className="text-sm font-medium">Número de telefone:</label>
-              <div className="flex">
-                <Select value={countryCode} onValueChange={setCountryCode}>
-                  <SelectTrigger className="w-[100px] rounded-r-none">
-                    <SelectValue placeholder="País" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="+55">🇧🇷 +55</SelectItem>
-                    <SelectItem value="+1">🇺🇸 +1</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  placeholder="(00) 00000-0000"
-                  value={phone}
-                  onChange={handlePhoneChange}
-                  onBlur={handlePhoneBlur}
-                  maxLength={15}
-                  className={cn(
-                    "flex-1 rounded-l-none border-l-0",
-                    phone &&
-                      !isValidPhone &&
-                      "border-red-500 focus-visible:ring-red-500"
-                  )}
-                />
-              </div>
-              {phone && !isValidPhone && (
-                <p className="text-sm text-red-500">
-                  Digite um número de telefone válido
-                </p>
-              )}
+          <div className="flex flex-col space-y-2 w-full">
+            <label className="text-sm font-medium">
+              Seu número de telefone:
+            </label>
+            <div className="p-2 bg-gray-700 rounded border border-gray-600">
+              {formatPhoneNumber(authUser?.phone || "")}
             </div>
           </div>
 
-          <div className="flex justify-between gap-2">
+          <div className="flex justify-between gap-2 col-span-2">
             <div className="flex flex-col space-y-2 w-1/2">
               <label className="text-sm font-medium">Serviço:</label>
               <Select
@@ -307,7 +275,7 @@ const Book = () => {
             </div>
           </div>
 
-          <div className="flex flex-col space-y-2">
+          <div className="flex flex-col space-y-2 col-span-2">
             <label className="text-sm font-medium">Horário:</label>
             <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
               {timeSlots.map(({ time, date: timeDate }) => {
@@ -347,8 +315,7 @@ const Book = () => {
             !selectedTime ||
             !selectedService ||
             !selectedEmployee ||
-            !phone ||
-            !isValidPhone
+            !authUser?.phone
           }
         >
           Confirmar Agendamento
