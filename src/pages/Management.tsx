@@ -441,16 +441,26 @@ const Management = () => {
     }
   };
 
-  // Modifique a função handleCreateService para atualizar o estado local
+  // Função de utilidade já existente para IDs - pode ser usada para ambos, serviços e funcionários
+  const generateUniqueId = (prefix = "id") => {
+    // Combina prefixo, timestamp e string aleatória para garantir unicidade
+    return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  };
+
+  // Modifique a função handleCreateService para usar o nome como ID do documento
   const handleCreateService = async (
     data: z.infer<typeof serviceFormSchema>
   ) => {
     try {
+      // Gere um ID único para o serviço
+      const uniqueId = generateUniqueId();
+
       const newService = {
         ...data,
-        service_id: data.name,
+        service_id: uniqueId,
       };
 
+      // Use o nome como ID do documento, mas armazene o ID único como um campo
       await updateDocument("services", data.name, newService);
 
       // Atualiza o estado local adicionando o novo serviço
@@ -508,14 +518,17 @@ const Management = () => {
     }
   };
 
-  // Funções para gerenciar funcionários
+  // Modifique a função handleCreateEmployee para usar IDs únicos
   const handleCreateEmployee = async (
     data: z.infer<typeof employeeFormSchema>
   ) => {
     try {
+      // Gere um ID único para o funcionário
+      const uniqueId = generateUniqueId("emp");
+
       // Garantindo que todos os campos obrigatórios estejam presentes
       const newEmployee: Employee = {
-        employee_id: data.employee_name,
+        employee_id: uniqueId, // Use o ID único gerado
         employee_name: data.employee_name,
         services: data.services,
       };
