@@ -118,6 +118,9 @@ const Management = () => {
   );
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
 
+  // Adicione esta variável de estado local para gerenciar serviços
+  const [localServices, setLocalServices] = useState<ServiceType[]>([]);
+
   console.log("webUser", webUsers);
 
   // Formulários
@@ -205,7 +208,7 @@ const Management = () => {
     }
   };
 
-  // Corrigindo o useEffect condicional
+  // Corrigindo o useEffect para carregar estados de checkbox
   useEffect(() => {
     if (employees.length > 0 && !loading) {
       loadInitialCheckboxStates();
@@ -372,10 +375,23 @@ const Management = () => {
     }
   };
 
-  // Funções para gerenciar serviços
+  // Adicione este useEffect para sincronizar os serviços do Firestore com o estado local
+  useEffect(() => {
+    if (!loadingServices && services.length > 0) {
+      setLocalServices(services);
+    }
+  }, [services, loadingServices]);
+
+  // Modifique a função handleDeleteService para atualizar o estado local
   const handleDeleteService = async (serviceName: string) => {
     try {
       await deleteDocument("services", serviceName);
+
+      // Atualiza o estado local removendo o serviço excluído
+      setLocalServices((prevServices) =>
+        prevServices.filter((service) => service.name !== serviceName)
+      );
+
       toast({
         title: "Sucesso!",
         description: "Serviço excluído com sucesso.",
@@ -408,6 +424,9 @@ const Management = () => {
           employees: updatedEmployees,
         });
 
+        // Atualizar a tabela de equipe localmente para refletir a mudança imediatamente
+        setTeam(updatedEmployees);
+
         toast({
           title: "Sucesso!",
           description: "Funcionário excluído com sucesso.",
@@ -422,15 +441,21 @@ const Management = () => {
     }
   };
 
-  // Funções para gerenciar serviços
+  // Modifique a função handleCreateService para atualizar o estado local
   const handleCreateService = async (
     data: z.infer<typeof serviceFormSchema>
   ) => {
     try {
-      await updateDocument("services", data.name, {
+      const newService = {
         ...data,
         service_id: data.name,
-      });
+      };
+
+      await updateDocument("services", data.name, newService);
+
+      // Atualiza o estado local adicionando o novo serviço
+      setLocalServices((prevServices) => [...prevServices, newService]);
+
       toast({
         title: "Sucesso!",
         description: "Serviço criado com sucesso.",
@@ -445,13 +470,30 @@ const Management = () => {
     }
   };
 
+  // Modifique a função handleEditService para atualizar o estado local
   const handleEditService = async (data: z.infer<typeof serviceFormSchema>) => {
     if (!editingService) return;
     try {
-      await updateDocument("services", editingService.service_id, {
+      const updatedService = {
         ...data,
         service_id: editingService.service_id,
-      });
+      };
+
+      await updateDocument(
+        "services",
+        editingService.service_id,
+        updatedService
+      );
+
+      // Atualiza o estado local substituindo o serviço editado
+      setLocalServices((prevServices) =>
+        prevServices.map((service) =>
+          service.service_id === editingService.service_id
+            ? updatedService
+            : service
+        )
+      );
+
       toast({
         title: "Sucesso!",
         description: "Serviço atualizado com sucesso.",
@@ -471,9 +513,11 @@ const Management = () => {
     data: z.infer<typeof employeeFormSchema>
   ) => {
     try {
-      const newEmployee = {
+      // Garantindo que todos os campos obrigatórios estejam presentes
+      const newEmployee: Employee = {
         employee_id: data.employee_name,
-        ...data,
+        employee_name: data.employee_name,
+        services: data.services,
       };
 
       // Verificar se já existe o documento colaborador
@@ -483,15 +527,22 @@ const Management = () => {
         // Se existir, adiciona o novo funcionário ao array existente
         const existingData = employeeDoc.data();
         const existingEmployees = existingData.employees || [];
+        const updatedEmployees = [...existingEmployees, newEmployee];
 
         await updateDocument("employees", "colaborador", {
-          employees: [...existingEmployees, newEmployee],
+          employees: updatedEmployees,
         });
+
+        // Atualizar a tabela de equipe localmente para refletir a mudança imediatamente
+        setTeam(updatedEmployees);
       } else {
         // Se não existir, cria o documento com o novo funcionário
         await updateDocument("employees", "colaborador", {
           employees: [newEmployee],
         });
+
+        // Atualizar a tabela de equipe localmente para refletir a mudança imediatamente
+        setTeam([newEmployee]);
       }
 
       toast({
@@ -536,6 +587,9 @@ const Management = () => {
           employees: updatedEmployees,
         });
 
+        // Atualizar a tabela de equipe localmente para refletir a mudança imediatamente
+        setTeam(updatedEmployees);
+
         toast({
           title: "Sucesso!",
           description: "Funcionário atualizado com sucesso.",
@@ -551,45 +605,32 @@ const Management = () => {
     }
   };
 
-  // Corrigindo o useEffect condicional para carregar dados
+  // Corrigindo os useEffect condicionais
   useEffect(() => {
-    const loadTeam = () => {
-      if (employees.length > 0) {
-        setTeam(employees[0]?.employees || []);
-      }
-    };
-
-    loadTeam();
+    if (employees.length > 0) {
+      setTeam(employees[0]?.employees || []);
+    }
   }, [employees]);
 
-  // Corrigindo o useEffect condicional para os formulários
   useEffect(() => {
-    const resetServiceForm = () => {
-      if (editingService) {
-        serviceForm.reset({
-          name: editingService.name,
-          description: editingService.description,
-          preco: editingService.preco,
-          service_duration: editingService.service_duration,
-        });
-      }
-    };
-
-    resetServiceForm();
-  }, [editingService]);
+    if (editingService) {
+      serviceForm.reset({
+        name: editingService.name,
+        description: editingService.description,
+        preco: editingService.preco,
+        service_duration: editingService.service_duration,
+      });
+    }
+  }, [editingService, serviceForm]);
 
   useEffect(() => {
-    const resetEmployeeForm = () => {
-      if (editingEmployee) {
-        employeeForm.reset({
-          employee_name: editingEmployee.employee_name,
-          services: editingEmployee.services,
-        });
-      }
-    };
-
-    resetEmployeeForm();
-  }, [editingEmployee]);
+    if (editingEmployee) {
+      employeeForm.reset({
+        employee_name: editingEmployee.employee_name,
+        services: editingEmployee.services,
+      });
+    }
+  }, [editingEmployee, employeeForm]);
 
   // Funções para gerenciar os diálogos
   const handleServiceDialogChange = (open: boolean) => {
@@ -808,7 +849,7 @@ const Management = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {services.map((service) => (
+                  {localServices.map((service) => (
                     <TableRow key={service.service_id}>
                       <TableCell>{service.name}</TableCell>
                       <TableCell>{service.description}</TableCell>
