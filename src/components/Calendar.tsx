@@ -179,6 +179,10 @@ const Calendar = () => {
     EventClickArg["event"] | null
   >(null);
   const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
+  const [occupiedTimeSlots, setOccupiedTimeSlots] = useState<{
+    [key: string]: boolean;
+  }>({});
+  const [hasAppointmentsInDay, setHasAppointmentsInDay] = useState(false);
 
   const timeSlots = [
     "09:00",
@@ -412,7 +416,12 @@ const Calendar = () => {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>{eventContent}</TooltipTrigger>
-            <TooltipContent>
+            <TooltipContent
+              className="text-sm max-w-[300px]"
+              side="right"
+              sideOffset={5}
+              avoidCollisions={true}
+            >
               {isDayOff ? (
                 <p>Dia de Folga</p>
               ) : isOutOfOffice ? (
@@ -470,13 +479,38 @@ const Calendar = () => {
 
     // Inicializa os checkboxes baseado no estado atual
     const initialTimeSlots: { [key: string]: boolean } = {};
+    const occupiedSlots: { [key: string]: boolean } = {};
+
+    // Verifica se há agendamentos no dia
+    let dayHasAppointments = false;
+
     dayData?.day_time.forEach((timeSlot) => {
       const baseHour = timeSlot.hour.split(":")[0] + ":00";
+
+      // Verifica se o horário tem agendamento
+      const hasAppointmentInSlot =
+        timeSlot.appointment_id !== "" &&
+        timeSlot.appointment_id !== "day_off" &&
+        timeSlot.appointment_id !== "out_of_office" &&
+        timeSlot.appointment_id !== "not_in_schedule" &&
+        timeSlot.service !== "none" &&
+        timeSlot.service !== "day_off" &&
+        timeSlot.service !== "out_of_office" &&
+        timeSlot.service !== "not_in_schedule";
+
+      if (hasAppointmentInSlot) {
+        dayHasAppointments = true;
+        occupiedSlots[baseHour] = true;
+      }
+
       initialTimeSlots[baseHour] =
         timeSlot.appointment_id !== "out_of_office" &&
         timeSlot.appointment_id !== "day_off" &&
         timeSlot.appointment_id !== "not_in_schedule";
     });
+
+    setHasAppointmentsInDay(dayHasAppointments);
+    setOccupiedTimeSlots(occupiedSlots);
     setDayTimeSlots(initialTimeSlots);
 
     setIsDialogOpen(true);
@@ -548,98 +582,55 @@ const Calendar = () => {
     if (!selectedEmployee || !selectedDate || isUpdating) return;
 
     try {
+      setIsUpdating(true);
       const selectedEmployeeData = employeesData.find(
         (emp) => emp.id === selectedEmployee
       );
 
       if (!selectedEmployeeData) return;
 
-      // Verificar se há agendamentos no dia selecionado
-      const dayData = selectedEmployeeData.calendar.find(
-        (day) => day.day === selectedDate.replace(/-/g, "/")
-      );
-
-      // Verificar se existem agendamentos
-      const hasAppointments = dayData?.day_time.some(
-        (timeSlot) =>
-          timeSlot.appointment_id !== "" &&
-          timeSlot.appointment_id !== "day_off" &&
-          timeSlot.appointment_id !== "out_of_office" &&
-          timeSlot.service !== "" &&
-          timeSlot.service !== "none" &&
-          timeSlot.service !== "day_off" &&
-          timeSlot.client_id !== "" &&
-          timeSlot.client_id !== "none" &&
-          timeSlot.client_id !== "day_off"
-      );
-
-      // Se estiver desativando o dia de folga, não precisa de confirmação
-      if (isDayOff || !hasAppointments) {
-        setIsUpdating(true);
-        await updateDayOffStatus();
-      } else {
-        // Pedir confirmação ao usuário
-        if (
-          confirm(
-            "Existem agendamentos neste dia. Tem certeza que deseja marcar como dia de folga? Todos os agendamentos serão perdidos."
-          )
-        ) {
-          setIsUpdating(true);
-          await updateDayOffStatus();
+      const updatedCalendar = selectedEmployeeData.calendar.map((day) => {
+        if (day.day === selectedDate.replace(/-/g, "/")) {
+          return {
+            ...day,
+            day_time: day.day_time.map((timeSlot) => ({
+              ...timeSlot,
+              // Se estiver marcando como dia de folga
+              appointment_id: !isDayOff ? "day_off" : "",
+              client_id: !isDayOff ? "day_off" : "none",
+              service: !isDayOff ? "day_off" : "none",
+            })),
+          };
         }
+        return day;
+      });
+
+      const employeeRef = doc(db, "calendar", selectedEmployee);
+      await updateDoc(employeeRef, {
+        calendar: updatedCalendar,
+      });
+
+      setEmployeesData((prev) =>
+        prev.map((emp) =>
+          emp.id === selectedEmployee
+            ? { ...emp, calendar: updatedCalendar }
+            : emp
+        )
+      );
+
+      // Atualiza os checkboxes quando desativa o dia de folga
+      if (isDayOff) {
+        const newTimeSlots: { [key: string]: boolean } = {};
+        timeSlots.forEach((time) => {
+          newTimeSlots[time] = true;
+        });
+        setDayTimeSlots(newTimeSlots);
       }
     } catch (error) {
       console.error("Erro ao atualizar dia:", error);
       alert("Erro ao atualizar o dia. Tente novamente.");
     } finally {
       setIsUpdating(false);
-    }
-  };
-
-  // Função auxiliar para atualizar o status do dia de folga
-  const updateDayOffStatus = async () => {
-    const selectedEmployeeData = employeesData.find(
-      (emp) => emp.id === selectedEmployee
-    );
-
-    if (!selectedEmployeeData) return;
-
-    const updatedCalendar = selectedEmployeeData.calendar.map((day) => {
-      if (day.day === selectedDate.replace(/-/g, "/")) {
-        return {
-          ...day,
-          day_time: day.day_time.map((timeSlot) => ({
-            ...timeSlot,
-            // Se estiver marcando como dia de folga
-            appointment_id: !isDayOff ? "day_off" : "",
-            client_id: !isDayOff ? "day_off" : "none",
-            service: !isDayOff ? "day_off" : "none",
-          })),
-        };
-      }
-      return day;
-    });
-
-    const employeeRef = doc(db, "calendar", selectedEmployee);
-    await updateDoc(employeeRef, {
-      calendar: updatedCalendar,
-    });
-
-    setEmployeesData((prev) =>
-      prev.map((emp) =>
-        emp.id === selectedEmployee
-          ? { ...emp, calendar: updatedCalendar }
-          : emp
-      )
-    );
-
-    // Atualiza os checkboxes quando desativa o dia de folga
-    if (isDayOff) {
-      const newTimeSlots: { [key: string]: boolean } = {};
-      timeSlots.forEach((time) => {
-        newTimeSlots[time] = true;
-      });
-      setDayTimeSlots(newTimeSlots);
     }
   };
 
@@ -686,15 +677,32 @@ const Calendar = () => {
             <TabsContent value="config">
               <div className="flex flex-col gap-6">
                 <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="dayOff"
-                    checked={isDayOff}
-                    disabled={isUpdating}
-                    onCheckedChange={() => {
-                      setIsDayOff(!isDayOff);
-                      handleDayOffChange();
-                    }}
-                  />
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div>
+                          <Checkbox
+                            id="dayOff"
+                            checked={isDayOff}
+                            disabled={isUpdating || hasAppointmentsInDay}
+                            onCheckedChange={() => {
+                              setIsDayOff(!isDayOff);
+                              handleDayOffChange();
+                            }}
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        className="text-sm max-w-[300px]"
+                        side="right"
+                        sideOffset={5}
+                        avoidCollisions={true}
+                      >
+                        Existem agendamentos neste dia. O cliente precisa
+                        reagendar para você poder marcar como dia de folga.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   <label
                     htmlFor="dayOff"
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
@@ -721,17 +729,39 @@ const Calendar = () => {
                               {time}
                             </TableCell>
                             <TableCell className="text-center">
-                              {updatingTime === time ? (
-                                <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                              ) : (
-                                <input
-                                  type="checkbox"
-                                  checked={dayTimeSlots[time] ?? true}
-                                  onChange={() => handleTimeSlotChange(time)}
-                                  disabled={isUpdating}
-                                  className="h-4 w-4 rounded border-border"
-                                />
-                              )}
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div>
+                                      {updatingTime === time ? (
+                                        <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                                      ) : (
+                                        <input
+                                          type="checkbox"
+                                          checked={dayTimeSlots[time] ?? true}
+                                          onChange={() =>
+                                            handleTimeSlotChange(time)
+                                          }
+                                          disabled={
+                                            isUpdating ||
+                                            occupiedTimeSlots[time]
+                                          }
+                                          className="h-4 w-4 rounded border-border"
+                                        />
+                                      )}
+                                    </div>
+                                  </TooltipTrigger>
+                                  {occupiedTimeSlots[time] && (
+                                    <TooltipContent className="text-sm max-w-[300px]">
+                                      <p>
+                                        Existe um agendamento neste horário. O
+                                        cliente precisa reagendar para você
+                                        poder marcar como indisponível.
+                                      </p>
+                                    </TooltipContent>
+                                  )}
+                                </Tooltip>
+                              </TooltipProvider>
                             </TableCell>
                           </TableRow>
                         ))}
