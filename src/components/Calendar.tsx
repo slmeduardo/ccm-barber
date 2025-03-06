@@ -248,93 +248,99 @@ const Calendar = () => {
     );
     if (!employeeData) return;
 
-    const calendarEvents = employeeData.calendar.flatMap((day) => {
-      // Verifica se é um dia de folga
-      const isDayOff = day.day_time[0]?.appointment_id === "day_off";
+    const calendarEvents = employeeData.calendar.flatMap<CalendarEvent>(
+      (day) => {
+        // Verifica se é um dia de folga
+        const isDayOff = day.day_time[0]?.appointment_id === "day_off";
 
-      if (isDayOff) {
-        return [
-          {
-            id: crypto.randomUUID(),
-            title: "Dia de Folga",
-            date: day.day.replace(/\//g, "-"),
-            start: `${day.day.replace(/\//g, "-")}T00:00:00`,
-            end: `${day.day.replace(/\//g, "-")}T23:59:59`,
-            allDay: true,
-            extendedProps: {
-              service: "day_off",
+        if (isDayOff) {
+          return [
+            {
+              id: crypto.randomUUID(),
+              title: "Dia de Folga",
+              date: day.day.replace(/\//g, "-"),
+              start: `${day.day.replace(/\//g, "-")}T00:00:00`,
+              end: `${day.day.replace(/\//g, "-")}T23:59:59`,
+              allDay: true,
+              extendedProps: {
+                service: "day_off",
+                hour: "00:00",
+              },
             },
-          },
+          ];
+        }
+
+        // Agrupa os horários out_of_office por hora
+        const outOfOfficeByHour = new Map<string, DayTime>();
+        day.day_time.forEach((appointment) => {
+          if (appointment.appointment_id === "out_of_office") {
+            const baseHour = appointment.hour.split(":")[0];
+            if (!outOfOfficeByHour.has(baseHour)) {
+              outOfOfficeByHour.set(baseHour, appointment);
+            }
+          }
+        });
+
+        // Processa os horários normais e out_of_office agrupados
+        return [
+          // Adiciona eventos out_of_office agrupados
+          ...Array.from(outOfOfficeByHour.values()).map((appointment) => ({
+            id: crypto.randomUUID(),
+            title: "Horário Indisponível",
+            date: day.day.replace(/\//g, "-"),
+            start: `${day.day.replace(/\//g, "-")}T${appointment.hour}`,
+            end: `${day.day.replace(/\//g, "-")}T${
+              appointment.hour.split(":")[0]
+            }:59`,
+            extendedProps: {
+              service: "out_of_office",
+              startHour: appointment.hour,
+              endHour: `${appointment.hour.split(":")[0]}:59`,
+              hour: appointment.hour,
+            },
+          })),
+          // Adiciona eventos normais
+          ...day.day_time
+            .filter(
+              (appointment) =>
+                appointment.service !== "none" &&
+                appointment.appointment_id !== "day_off" &&
+                appointment.appointment_id !== "out_of_office" &&
+                appointment.appointment_id !== "not_in_schedule" &&
+                appointment.service !== "not_in_schedule"
+            )
+            .map((appointment) => {
+              const service = services.find(
+                (s) => s.description === appointment.service
+              );
+              const durationInMinutes = (service?.service_duration || 1) * 15;
+
+              const startDate = new Date(
+                `${day.day.replace(/\//g, "-")}T${appointment.hour}`
+              );
+              const endDate = new Date(
+                startDate.getTime() + durationInMinutes * 60000
+              );
+
+              return {
+                id: appointment.appointment_id || crypto.randomUUID(),
+                title: `${appointment.service} - ${appointment.hour}`,
+                date: day.day.replace(/\//g, "-"),
+                start: startDate.toISOString(),
+                end: endDate.toISOString(),
+                extendedProps: {
+                  client_id: appointment.client_id,
+                  hour: appointment.hour,
+                  service: appointment.service,
+                },
+              };
+            }),
         ];
       }
-
-      // Agrupa os horários out_of_office por hora
-      const outOfOfficeByHour = new Map<string, DayTime>();
-      day.day_time.forEach((appointment) => {
-        if (appointment.appointment_id === "out_of_office") {
-          const baseHour = appointment.hour.split(":")[0];
-          if (!outOfOfficeByHour.has(baseHour)) {
-            outOfOfficeByHour.set(baseHour, appointment);
-          }
-        }
-      });
-
-      // Processa os horários normais e out_of_office agrupados
-      return [
-        // Adiciona eventos out_of_office agrupados
-        ...Array.from(outOfOfficeByHour.values()).map((appointment) => ({
-          id: crypto.randomUUID(),
-          title: "Horário Indisponível",
-          date: day.day.replace(/\//g, "-"),
-          start: `${day.day.replace(/\//g, "-")}T${appointment.hour}`,
-          end: `${day.day.replace(/\//g, "-")}T${
-            appointment.hour.split(":")[0]
-          }:59`,
-          extendedProps: {
-            service: "out_of_office",
-            startHour: appointment.hour,
-            endHour: `${appointment.hour.split(":")[0]}:59`,
-          },
-        })),
-        // Adiciona eventos normais
-        ...day.day_time
-          .filter(
-            (appointment) =>
-              appointment.service !== "none" &&
-              appointment.appointment_id !== "day_off" &&
-              appointment.appointment_id !== "out_of_office"
-          )
-          .map((appointment) => {
-            const service = services.find(
-              (s) => s.description === appointment.service
-            );
-            const durationInMinutes = (service?.service_duration || 1) * 15;
-
-            const startDate = new Date(
-              `${day.day.replace(/\//g, "-")}T${appointment.hour}`
-            );
-            const endDate = new Date(
-              startDate.getTime() + durationInMinutes * 60000
-            );
-
-            return {
-              id: appointment.appointment_id || crypto.randomUUID(),
-              title: `${appointment.service} - ${appointment.hour}`,
-              date: day.day.replace(/\//g, "-"),
-              start: startDate.toISOString(),
-              end: endDate.toISOString(),
-              extendedProps: {
-                client_id: appointment.client_id,
-                hour: appointment.hour,
-                service: appointment.service,
-              },
-            };
-          }),
-      ];
-    });
+    );
 
     // Correção do problema de tipo no reduce
-    const uniqueEvents = calendarEvents.reduce<typeof calendarEvents>(
+    const uniqueEvents = calendarEvents.reduce<CalendarEvent[]>(
       (acc, current) => {
         const x = acc.find((item) => item.id === current.id);
         if (!x) {
@@ -392,7 +398,7 @@ const Calendar = () => {
             {eventInfo.event.extendedProps.hour && (
               <p>{eventInfo.event.extendedProps.hour}</p>
             )}
-            {isMonthView && false && (
+            {isMonthView && (
               <strong>{eventInfo.event.extendedProps.service}</strong>
             )}
           </>
@@ -542,55 +548,98 @@ const Calendar = () => {
     if (!selectedEmployee || !selectedDate || isUpdating) return;
 
     try {
-      setIsUpdating(true);
       const selectedEmployeeData = employeesData.find(
         (emp) => emp.id === selectedEmployee
       );
 
       if (!selectedEmployeeData) return;
 
-      const updatedCalendar = selectedEmployeeData.calendar.map((day) => {
-        if (day.day === selectedDate.replace(/-/g, "/")) {
-          return {
-            ...day,
-            day_time: day.day_time.map((timeSlot) => ({
-              ...timeSlot,
-              // Se estiver marcando como dia de folga
-              appointment_id: !isDayOff ? "day_off" : "",
-              client_id: !isDayOff ? "day_off" : "none",
-              service: !isDayOff ? "day_off" : "none",
-            })),
-          };
-        }
-        return day;
-      });
-
-      const employeeRef = doc(db, "calendar", selectedEmployee);
-      await updateDoc(employeeRef, {
-        calendar: updatedCalendar,
-      });
-
-      setEmployeesData((prev) =>
-        prev.map((emp) =>
-          emp.id === selectedEmployee
-            ? { ...emp, calendar: updatedCalendar }
-            : emp
-        )
+      // Verificar se há agendamentos no dia selecionado
+      const dayData = selectedEmployeeData.calendar.find(
+        (day) => day.day === selectedDate.replace(/-/g, "/")
       );
 
-      // Atualiza os checkboxes quando desativa o dia de folga
-      if (isDayOff) {
-        const newTimeSlots: { [key: string]: boolean } = {};
-        timeSlots.forEach((time) => {
-          newTimeSlots[time] = true;
-        });
-        setDayTimeSlots(newTimeSlots);
+      // Verificar se existem agendamentos
+      const hasAppointments = dayData?.day_time.some(
+        (timeSlot) =>
+          timeSlot.appointment_id !== "" &&
+          timeSlot.appointment_id !== "day_off" &&
+          timeSlot.appointment_id !== "out_of_office" &&
+          timeSlot.service !== "" &&
+          timeSlot.service !== "none" &&
+          timeSlot.service !== "day_off" &&
+          timeSlot.client_id !== "" &&
+          timeSlot.client_id !== "none" &&
+          timeSlot.client_id !== "day_off"
+      );
+
+      // Se estiver desativando o dia de folga, não precisa de confirmação
+      if (isDayOff || !hasAppointments) {
+        setIsUpdating(true);
+        await updateDayOffStatus();
+      } else {
+        // Pedir confirmação ao usuário
+        if (
+          confirm(
+            "Existem agendamentos neste dia. Tem certeza que deseja marcar como dia de folga? Todos os agendamentos serão perdidos."
+          )
+        ) {
+          setIsUpdating(true);
+          await updateDayOffStatus();
+        }
       }
     } catch (error) {
       console.error("Erro ao atualizar dia:", error);
       alert("Erro ao atualizar o dia. Tente novamente.");
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  // Função auxiliar para atualizar o status do dia de folga
+  const updateDayOffStatus = async () => {
+    const selectedEmployeeData = employeesData.find(
+      (emp) => emp.id === selectedEmployee
+    );
+
+    if (!selectedEmployeeData) return;
+
+    const updatedCalendar = selectedEmployeeData.calendar.map((day) => {
+      if (day.day === selectedDate.replace(/-/g, "/")) {
+        return {
+          ...day,
+          day_time: day.day_time.map((timeSlot) => ({
+            ...timeSlot,
+            // Se estiver marcando como dia de folga
+            appointment_id: !isDayOff ? "day_off" : "",
+            client_id: !isDayOff ? "day_off" : "none",
+            service: !isDayOff ? "day_off" : "none",
+          })),
+        };
+      }
+      return day;
+    });
+
+    const employeeRef = doc(db, "calendar", selectedEmployee);
+    await updateDoc(employeeRef, {
+      calendar: updatedCalendar,
+    });
+
+    setEmployeesData((prev) =>
+      prev.map((emp) =>
+        emp.id === selectedEmployee
+          ? { ...emp, calendar: updatedCalendar }
+          : emp
+      )
+    );
+
+    // Atualiza os checkboxes quando desativa o dia de folga
+    if (isDayOff) {
+      const newTimeSlots: { [key: string]: boolean } = {};
+      timeSlots.forEach((time) => {
+        newTimeSlots[time] = true;
+      });
+      setDayTimeSlots(newTimeSlots);
     }
   };
 
