@@ -99,7 +99,9 @@ export function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
   };
 
   const validatePhone = (phoneNumber: string) => {
+    // Remove todos os caracteres não numéricos
     const numbers = phoneNumber.replace(/\D/g, "");
+    // Verifica se tem 10 (fixo) ou 11 (celular) dígitos
     const isValid = numbers.length >= 10 && numbers.length <= 11;
     setIsValidPhone(isValid);
     return isValid;
@@ -115,7 +117,14 @@ export function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
     const target = event.target as HTMLInputElement;
     let value = target.value.replace(/\D/g, "");
 
+    // Verifica se tem 11 dígitos (com 9 inicial após DDD)
+    // Se tiver, remove o 9 após o DDD
+    if (value.length === 11 && value.charAt(2) === "9") {
+      value = value.substring(0, 2) + value.substring(3);
+    }
+
     if (value.length <= 11) {
+      // Aplica a máscara
       if (value.length > 2) {
         value = value.replace(/^(\d{2})(\d)/g, "($1) $2");
       }
@@ -125,7 +134,9 @@ export function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
       target.value = value;
 
       setPhone(value);
+      // Valida o número a cada mudança
       validatePhone(value);
+      // Atualiza o valor no formulário
       field.onChange(value);
 
       // Verifica se o número já existe no Firestore
@@ -151,7 +162,17 @@ export function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
   };
 
   const formatPhoneForDatabase = (phone: string, countryCode: string) => {
-    const cleanNumber = countryCode.replace("+", "") + phone.replace(/\D/g, "");
+    // Remove todos os caracteres não numéricos
+    let cleanNumber = phone.replace(/\D/g, "");
+
+    // Verifica se tem 11 dígitos (inclui o 9 após DDD)
+    // Se tiver, remove o 9 após o DDD para padronizar
+    if (cleanNumber.length === 11 && cleanNumber.charAt(2) === "9") {
+      cleanNumber = cleanNumber.substring(0, 2) + cleanNumber.substring(3);
+    }
+
+    // Adiciona o código do país e formata para o padrão do WhatsApp
+    cleanNumber = countryCode.replace("+", "") + cleanNumber;
     return `${cleanNumber}@s.whatsapp.net`;
   };
 

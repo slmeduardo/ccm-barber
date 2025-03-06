@@ -373,9 +373,9 @@ const Management = () => {
   };
 
   // Funções para gerenciar serviços
-  const handleDeleteService = async (serviceId: string) => {
+  const handleDeleteService = async (serviceName: string) => {
     try {
-      await deleteDocument("services", serviceId);
+      await deleteDocument("services", serviceName);
       toast({
         title: "Sucesso!",
         description: "Serviço excluído com sucesso.",
@@ -850,7 +850,7 @@ const Management = () => {
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                 <AlertDialogAction
                                   onClick={() =>
-                                    handleDeleteService(service.service_id)
+                                    handleDeleteService(service.name)
                                   }
                                 >
                                   Confirmar

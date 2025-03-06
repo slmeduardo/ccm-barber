@@ -10,33 +10,6 @@ import { useServices } from "@/hooks/useFirestore";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
-const services = [
-  {
-    name: "Classic Haircut",
-    description: "Traditional cut with modern styling",
-    duration: "45 min",
-    price: "$35",
-  },
-  {
-    name: "Beard Trim",
-    description: "Shape and style your facial hair",
-    duration: "30 min",
-    price: "$25",
-  },
-  {
-    name: "Hot Towel Shave",
-    description: "Traditional straight razor shave",
-    duration: "45 min",
-    price: "$40",
-  },
-  {
-    name: "Complete Package",
-    description: "Haircut, beard trim, and hot towel shave",
-    duration: "90 min",
-    price: "$90",
-  },
-];
-
 export type Service = {
   service_id: string;
   description: string;
