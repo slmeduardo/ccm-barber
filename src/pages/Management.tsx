@@ -48,8 +48,16 @@ import {
   useWebUsers,
 } from "@/hooks/useFirestore";
 import { db } from "@/lib/firebase";
+import {
+  createOrUpdateEmployeeCalendar,
+  deleteEmployeeCalendar,
+  generateHourlySlots,
+  generateTimeSlots,
+  getHourFromTimeSlot,
+  getQuarterSlotsForHour,
+} from "@/utils/calendarUtils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -121,8 +129,6 @@ const Management = () => {
   // Adicione esta variável de estado local para gerenciar serviços
   const [localServices, setLocalServices] = useState<ServiceType[]>([]);
 
-  console.log("webUser", webUsers);
-
   // Formulários
   const serviceForm = useForm<z.infer<typeof serviceFormSchema>>({
     resolver: zodResolver(serviceFormSchema),
@@ -156,19 +162,10 @@ const Management = () => {
     "Sábado",
   ];
 
-  const timeSlots = [
-    "09:00",
-    "10:00",
-    "11:00",
-    "12:00",
-    "13:00",
-    "14:00",
-    "15:00",
-    "16:00",
-    "17:00",
-    "18:00",
-    "19:00",
-  ];
+  // Usar os slots de tempo completos para o calendário
+  const timeSlots = generateTimeSlots();
+  // Usar apenas as horas inteiras para os checkboxes
+  const hourlySlots = generateHourlySlots();
 
   // Função para carregar o estado inicial dos checkboxes do Firestore
   const loadInitialCheckboxStates = async () => {
@@ -188,13 +185,28 @@ const Management = () => {
             const dayOfWeek = date.getDay();
             const weekDay = weekDays[dayOfWeek];
 
-            dayObj.day_time.forEach((timeSlot: DayTimeSlot) => {
-              const baseHour = timeSlot.hour.split(":")[0].padStart(2, "0");
-              const key = `${weekDay}-${baseHour}:00`;
+            // Agrupar os slots de 15 minutos por hora
+            const hoursAvailability: { [hour: string]: boolean[] } = {};
 
-              // Define como true se não estiver marcado como "not_in_schedule"
-              initialStates[key] =
-                timeSlot.appointment_id !== "not_in_schedule";
+            dayObj.day_time.forEach((timeSlot: DayTimeSlot) => {
+              const hour = getHourFromTimeSlot(timeSlot.hour);
+
+              if (!hoursAvailability[hour]) {
+                hoursAvailability[hour] = [];
+              }
+
+              // Adiciona true se o slot estiver disponível (não marcado como "not_in_schedule")
+              const isAvailable = timeSlot.appointment_id !== "not_in_schedule";
+              hoursAvailability[hour].push(isAvailable);
+            });
+
+            // Para cada hora, verifica se todos os slots de 15 minutos estão disponíveis
+            Object.keys(hoursAvailability).forEach((hour) => {
+              const isHourFullyAvailable = hoursAvailability[hour].every(
+                (status) => status === true
+              );
+              const key = `${weekDay}-${hour}:00`;
+              initialStates[key] = isHourFullyAvailable;
             });
           });
         }
@@ -215,16 +227,20 @@ const Management = () => {
     }
   }, [employees, loading]);
 
-  const handleCheckboxChange = async (day: string, time: string) => {
+  const handleCheckboxChange = async (day: string, hourSlot: string) => {
     try {
-      const key = `${day}-${time}`;
-      const baseHour = time.split(":")[0].padStart(2, "0");
+      const key = `${day}-${hourSlot}`;
+      const hour = getHourFromTimeSlot(hourSlot);
+      const quarterSlots = getQuarterSlotsForHour(hour);
 
       // Atualiza o estado local
       setCheckboxStates((prev) => ({
         ...prev,
         [key]: !prev[key],
       }));
+
+      // Valor para "not_in_schedule" ou limpo baseado no novo estado do checkbox
+      const isNowAvailable = !checkboxStates[key];
 
       // Atualiza todos os funcionários
       for (const employeeGroup of employees) {
@@ -246,6 +262,7 @@ const Management = () => {
               return {
                 ...dayObj,
                 day_time: dayObj.day_time.map((timeSlot: DayTimeSlot) => {
+                  // Ignora slots que já têm agendamentos
                   if (
                     timeSlot.appointment_id !== "" &&
                     timeSlot.appointment_id !== "not_in_schedule"
@@ -253,22 +270,20 @@ const Management = () => {
                     return timeSlot;
                   }
 
-                  const slotBaseHour = timeSlot.hour
-                    .split(":")[0]
-                    .padStart(2, "0");
-                  if (slotBaseHour === baseHour) {
-                    return !checkboxStates[key]
+                  // Verifica se este slot está nos slots de 15 minutos da hora selecionada
+                  if (quarterSlots.includes(timeSlot.hour)) {
+                    return isNowAvailable
                       ? {
-                          appointment_id: "not_in_schedule",
-                          client_id: "not_in_schedule",
-                          hour: timeSlot.hour,
-                          service: "not_in_schedule",
-                        }
-                      : {
                           appointment_id: "",
                           client_id: "none",
                           hour: timeSlot.hour,
                           service: "none",
+                        }
+                      : {
+                          appointment_id: "not_in_schedule",
+                          client_id: "not_in_schedule",
+                          hour: timeSlot.hour,
+                          service: "not_in_schedule",
                         };
                   }
 
@@ -284,6 +299,13 @@ const Management = () => {
           });
         }
       }
+
+      toast({
+        title: isNowAvailable ? "Horário disponibilizado" : "Horário bloqueado",
+        description: `${day} ${hourSlot} ${
+          isNowAvailable ? "disponível" : "indisponível"
+        }.`,
+      });
     } catch (error) {
       console.error("Erro ao atualizar horários:", error);
       toast({
@@ -297,71 +319,80 @@ const Management = () => {
   const handleSubmit = async () => {
     try {
       setIsUpdating(true);
-      for (const employeeGroup of employees) {
-        for (const employee of employeeGroup.employees) {
-          const employeeName = employee.employee_name;
 
-          const employeeDoc = await getDoc(doc(db, "calendar", employeeName));
-          if (!employeeDoc.exists()) continue;
+      // Obter todos os funcionários do Firestore
+      const calendarCollection = collection(db, "calendar");
+      const calendarSnapshot = await getDocs(calendarCollection);
 
-          const existingData = employeeDoc.data();
-          const updatedCalendar = existingData.calendar.map(
-            (dayObj: {
-              day: string;
-              day_time: Array<{
-                appointment_id: string;
-                client_id: string;
-                hour: string;
-                service: string;
-              }>;
-            }) => {
-              const date = new Date(dayObj.day);
-              const dayOfWeek = date.getDay();
-              const weekDay = weekDays[dayOfWeek];
+      // Para cada funcionário, atualizar o calendário
+      for (const employeeDoc of calendarSnapshot.docs) {
+        const employeeName = employeeDoc.id;
+        const employeeData = employeeDoc.data();
 
-              return {
-                ...dayObj,
-                day_time: dayObj.day_time.map((timeSlot) => {
-                  if (
-                    timeSlot.appointment_id !== "" &&
-                    timeSlot.appointment_id !== "not_in_schedule"
-                  ) {
-                    return timeSlot;
-                  }
-
-                  // Corrige o formato da hora base para garantir dois dígitos
-                  const baseHour = timeSlot.hour.split(":")[0].padStart(2, "0");
-                  const checkboxKey = `${weekDay}-${baseHour}:00`;
-                  const isChecked =
-                    checkboxStates[checkboxKey] ?? weekDay !== "Domingo";
-
-                  return isChecked
-                    ? {
-                        appointment_id: "",
-                        client_id: "none",
-                        hour: timeSlot.hour,
-                        service: "none",
-                      }
-                    : {
-                        appointment_id: "not_in_schedule",
-                        client_id: "not_in_schedule",
-                        hour: timeSlot.hour,
-                        service: "not_in_schedule",
-                      };
-                }),
-              };
-            }
-          );
-
-          await updateDocument("calendar", employeeName, {
-            ...existingData,
-            calendar: updatedCalendar,
-          });
+        if (!employeeData.calendar || !Array.isArray(employeeData.calendar)) {
+          console.warn(`Calendário inválido para ${employeeName}`);
+          continue;
         }
+
+        const updatedCalendar = employeeData.calendar.map(
+          (dayObj: {
+            day: string;
+            day_time: Array<{
+              appointment_id: string;
+              client_id: string;
+              hour: string;
+              service: string;
+            }>;
+          }) => {
+            const date = new Date(dayObj.day);
+            const dayOfWeek = date.getDay();
+            const weekDay = weekDays[dayOfWeek];
+
+            return {
+              ...dayObj,
+              day_time: dayObj.day_time.map((timeSlot) => {
+                // Se o slot já tem um agendamento ou não é "not_in_schedule", não altera
+                if (
+                  timeSlot.appointment_id !== "" &&
+                  timeSlot.appointment_id !== "not_in_schedule"
+                ) {
+                  return timeSlot;
+                }
+
+                // Obtém a hora base e verifica se o checkbox para esta hora está marcado
+                const hour = getHourFromTimeSlot(timeSlot.hour);
+                const checkboxKey = `${weekDay}-${hour}:00`;
+                const isChecked =
+                  checkboxStates[checkboxKey] ?? weekDay !== "Domingo";
+
+                // Atualiza o slot com base no estado do checkbox
+                return isChecked
+                  ? {
+                      appointment_id: "",
+                      client_id: "none",
+                      hour: timeSlot.hour,
+                      service: "none",
+                    }
+                  : {
+                      appointment_id: "not_in_schedule",
+                      client_id: "not_in_schedule",
+                      hour: timeSlot.hour,
+                      service: "not_in_schedule",
+                    };
+              }),
+            };
+          }
+        );
+
+        // Atualiza o documento do funcionário usando updateDocument
+        await updateDocument("calendar", employeeName, {
+          calendar: updatedCalendar,
+        });
       }
+
       toast({
         title: "Sucesso!",
-        description: "Horários atualizados com sucesso.",
+        description: "Horários atualizados para todos os funcionários.",
       });
     } catch (error) {
       console.error("Erro ao atualizar horários:", error);
@@ -415,6 +446,11 @@ const Management = () => {
         const existingData = employeeDoc.data();
         const existingEmployees = existingData.employees || [];
 
+        // Encontrar o funcionário para obter o nome antes de remover
+        const employeeToDelete = existingEmployees.find(
+          (emp: Employee) => emp.employee_id === employeeId
+        );
+
         // Remover o funcionário do array
         const updatedEmployees = existingEmployees.filter(
           (emp: Employee) => emp.employee_id !== employeeId
@@ -426,6 +462,11 @@ const Management = () => {
 
         // Atualizar a tabela de equipe localmente para refletir a mudança imediatamente
         setTeam(updatedEmployees);
+
+        // Remove o calendário do funcionário se ele existir
+        if (employeeToDelete) {
+          await deleteEmployeeCalendar(employeeToDelete.employee_name);
+        }
 
         toast({
           title: "Sucesso!",
@@ -557,6 +598,9 @@ const Management = () => {
         // Atualizar a tabela de equipe localmente para refletir a mudança imediatamente
         setTeam([newEmployee]);
       }
+
+      // Cria ou atualiza o calendário para o novo funcionário
+      await createOrUpdateEmployeeCalendar(data.employee_name);
 
       toast({
         title: "Sucesso!",
@@ -713,7 +757,7 @@ const Management = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {timeSlots.map((time) => (
+                  {hourlySlots.map((time) => (
                     <TableRow key={time}>
                       <TableCell className="font-medium">{time}</TableCell>
                       {weekDays.map((day) => (

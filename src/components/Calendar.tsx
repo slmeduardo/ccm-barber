@@ -27,9 +27,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { toast } from "@/components/ui/use-toast";
 import { db } from "@/config/firebaseConfig";
 import { cn } from "@/lib/utils";
 import { Service } from "@/pages/Services";
+import {
+  generateHourlySlots,
+  generateTimeSlots,
+  getHourFromTimeSlot,
+  getQuarterSlotsForHour,
+} from "@/utils/calendarUtils";
 import { EventClickArg } from "@fullcalendar/core";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -184,18 +191,10 @@ const Calendar = () => {
   }>({});
   const [hasAppointmentsInDay, setHasAppointmentsInDay] = useState(false);
 
-  const timeSlots = [
-    "09:00",
-    "10:00",
-    "11:00",
-    "12:00",
-    "13:00",
-    "14:00",
-    "15:00",
-    "16:00",
-    "17:00",
-    "18:00",
-  ];
+  // Usar os slots de tempo das 8:00 às 20:00
+  const timeSlots = generateTimeSlots();
+  // Usar apenas as horas inteiras para os checkboxes na interface
+  const hourlySlots = generateHourlySlots();
 
   useEffect(() => {
     const fetchCalendar = async () => {
@@ -484,8 +483,18 @@ const Calendar = () => {
     // Verifica se há agendamentos no dia
     let dayHasAppointments = false;
 
+    // Agrupar slots de 15 minutos por hora
+    const hourGroups: { [hourKey: string]: DayTime[] } = {};
+
     dayData?.day_time.forEach((timeSlot) => {
-      const baseHour = timeSlot.hour.split(":")[0] + ":00";
+      const hourOnly = getHourFromTimeSlot(timeSlot.hour);
+      const hourKey = `${hourOnly}:00`;
+
+      if (!hourGroups[hourKey]) {
+        hourGroups[hourKey] = [];
+      }
+
+      hourGroups[hourKey].push(timeSlot);
 
       // Verifica se o horário tem agendamento
       const hasAppointmentInSlot =
@@ -500,13 +509,20 @@ const Calendar = () => {
 
       if (hasAppointmentInSlot) {
         dayHasAppointments = true;
-        occupiedSlots[baseHour] = true;
+        occupiedSlots[hourKey] = true;
       }
+    });
 
-      initialTimeSlots[baseHour] =
-        timeSlot.appointment_id !== "out_of_office" &&
-        timeSlot.appointment_id !== "day_off" &&
-        timeSlot.appointment_id !== "not_in_schedule";
+    // Para cada hora, verifica se todos os slots de 15 minutos estão disponíveis
+    Object.keys(hourGroups).forEach((hourKey) => {
+      const allSlotsAvailable = hourGroups[hourKey].every(
+        (slot) =>
+          slot.appointment_id !== "out_of_office" &&
+          slot.appointment_id !== "day_off" &&
+          slot.appointment_id !== "not_in_schedule"
+      );
+
+      initialTimeSlots[hourKey] = allSlotsAvailable;
     });
 
     setHasAppointmentsInDay(dayHasAppointments);
@@ -516,33 +532,49 @@ const Calendar = () => {
     setIsDialogOpen(true);
   };
 
-  const handleTimeSlotChange = async (time: string) => {
+  const handleTimeSlotChange = async (hourSlot: string) => {
     if (!selectedEmployee || !selectedDate || isUpdating) return;
 
     try {
       setIsUpdating(true);
-      setUpdatingTime(time);
+      setUpdatingTime(hourSlot);
       const selectedEmployeeData = employeesData.find(
         (emp) => emp.id === selectedEmployee
       );
 
       if (!selectedEmployeeData) return;
 
-      const baseHour = time.split(":")[0];
+      const hour = getHourFromTimeSlot(hourSlot);
+      const quarterSlots = getQuarterSlotsForHour(hour);
+
+      // Novo status que será aplicado a todos os slots de 15 minutos
+      const willBeAvailable = !dayTimeSlots[hourSlot];
 
       const updatedCalendar = selectedEmployeeData.calendar.map((day) => {
         if (day.day === selectedDate.replace(/-/g, "/")) {
           return {
             ...day,
             day_time: day.day_time.map((timeSlot) => {
-              if (timeSlot.hour.split(":")[0] === baseHour) {
-                const isAvailable = !dayTimeSlots[time];
+              // Se o slot de tempo atual pertence à hora que estamos alterando
+              if (quarterSlots.includes(timeSlot.hour)) {
+                // Verificar se o slot já tem um agendamento
+                const hasAppointment =
+                  timeSlot.appointment_id !== "" &&
+                  timeSlot.appointment_id !== "out_of_office" &&
+                  timeSlot.appointment_id !== "day_off" &&
+                  timeSlot.appointment_id !== "not_in_schedule";
+
+                // Se já tem agendamento, não altera
+                if (hasAppointment) {
+                  return timeSlot;
+                }
+
+                // Caso contrário, atualiza conforme o novo status
                 return {
                   ...timeSlot,
-                  // Usando out_of_office ao invés de not_in_schedule
-                  appointment_id: isAvailable ? "" : "out_of_office",
-                  client_id: isAvailable ? "none" : "out_of_office",
-                  service: isAvailable ? "none" : "out_of_office",
+                  appointment_id: willBeAvailable ? "" : "out_of_office",
+                  client_id: willBeAvailable ? "none" : "out_of_office",
+                  service: willBeAvailable ? "none" : "out_of_office",
                 };
               }
               return timeSlot;
@@ -567,11 +599,24 @@ const Calendar = () => {
 
       setDayTimeSlots((prev) => ({
         ...prev,
-        [time]: !prev[time],
+        [hourSlot]: willBeAvailable,
       }));
+
+      toast({
+        title: willBeAvailable
+          ? "Horário disponibilizado"
+          : "Horário bloqueado",
+        description: `Horário ${hourSlot} ${
+          willBeAvailable ? "disponível" : "indisponível"
+        }.`,
+      });
     } catch (error) {
       console.error("Erro ao atualizar horário:", error);
-      alert("Erro ao atualizar o horário. Tente novamente.");
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro ao atualizar o horário. Tente novamente.",
+      });
     } finally {
       setIsUpdating(false);
       setUpdatingTime(null);
@@ -723,7 +768,7 @@ const Calendar = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {timeSlots.map((time) => (
+                        {hourlySlots.map((time) => (
                           <TableRow key={time}>
                             <TableCell className="text-center font-medium">
                               {time}
