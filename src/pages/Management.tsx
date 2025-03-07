@@ -222,7 +222,9 @@ const Management = () => {
 
   // Corrigindo o useEffect para carregar estados de checkbox
   useEffect(() => {
-    if (employees.length > 0 && !loading) {
+    if (loading) return;
+
+    if (employees.length > 0) {
       loadInitialCheckboxStates();
     }
   }, [employees, loading]);
@@ -299,13 +301,6 @@ const Management = () => {
           });
         }
       }
-
-      toast({
-        title: isNowAvailable ? "Horário disponibilizado" : "Horário bloqueado",
-        description: `${day} ${hourSlot} ${
-          isNowAvailable ? "disponível" : "indisponível"
-        }.`,
-      });
     } catch (error) {
       console.error("Erro ao atualizar horários:", error);
       toast({
@@ -408,7 +403,9 @@ const Management = () => {
 
   // Adicione este useEffect para sincronizar os serviços do Firestore com o estado local
   useEffect(() => {
-    if (!loadingServices && services.length > 0) {
+    if (loadingServices) return;
+
+    if (services.length > 0) {
       setLocalServices(services);
     }
   }, [services, loadingServices]);
@@ -505,7 +502,16 @@ const Management = () => {
       await updateDocument("services", data.name, newService);
 
       // Atualiza o estado local adicionando o novo serviço
-      setLocalServices((prevServices) => [...prevServices, newService]);
+      setLocalServices((prevServices) => [
+        ...prevServices,
+        {
+          service_id: uniqueId,
+          name: data.name,
+          description: data.description,
+          preco: data.preco,
+          service_duration: data.service_duration,
+        },
+      ]);
 
       toast({
         title: "Sucesso!",
@@ -540,7 +546,13 @@ const Management = () => {
       setLocalServices((prevServices) =>
         prevServices.map((service) =>
           service.service_id === editingService.service_id
-            ? updatedService
+            ? {
+                service_id: updatedService.service_id,
+                name: data.name,
+                description: data.description,
+                preco: data.preco,
+                service_duration: data.service_duration,
+              }
             : service
         )
       );
@@ -599,8 +611,21 @@ const Management = () => {
         setTeam([newEmployee]);
       }
 
-      // Cria ou atualiza o calendário para o novo funcionário
-      await createOrUpdateEmployeeCalendar(data.employee_name);
+      // Após atualizar os funcionários, cria ou atualiza o calendário para o novo funcionário
+      try {
+        console.log(
+          `Iniciando criação do calendário para novo funcionário: ${data.employee_name}`
+        );
+        await createOrUpdateEmployeeCalendar(data.employee_name);
+        console.log(`Calendário para ${data.employee_name} criado com sucesso`);
+      } catch (calendarError) {
+        console.error(
+          "Erro ao criar calendário para o novo funcionário:",
+          calendarError
+        );
+        // Continua o fluxo mesmo se falhar a criação do calendário
+        // Não queremos perder o funcionário criado por causa de um erro no calendário
+      }
 
       toast({
         title: "Sucesso!",
@@ -608,6 +633,7 @@ const Management = () => {
       });
       handleEmployeeDialogChange(false);
     } catch (error) {
+      console.error("Erro ao criar funcionário:", error);
       toast({
         variant: "destructive",
         title: "Erro",
@@ -664,29 +690,29 @@ const Management = () => {
 
   // Corrigindo os useEffect condicionais
   useEffect(() => {
-    if (employees.length > 0) {
-      setTeam(employees[0]?.employees || []);
-    }
+    if (employees.length === 0) return;
+
+    setTeam(employees[0]?.employees || []);
   }, [employees]);
 
   useEffect(() => {
-    if (editingService) {
-      serviceForm.reset({
-        name: editingService.name,
-        description: editingService.description,
-        preco: editingService.preco,
-        service_duration: editingService.service_duration,
-      });
-    }
+    if (!editingService) return;
+
+    serviceForm.reset({
+      name: editingService.name,
+      description: editingService.description,
+      preco: editingService.preco,
+      service_duration: editingService.service_duration,
+    });
   }, [editingService, serviceForm]);
 
   useEffect(() => {
-    if (editingEmployee) {
-      employeeForm.reset({
-        employee_name: editingEmployee.employee_name,
-        services: editingEmployee.services,
-      });
-    }
+    if (!editingEmployee) return;
+
+    employeeForm.reset({
+      employee_name: editingEmployee.employee_name,
+      services: editingEmployee.services,
+    });
   }, [editingEmployee, employeeForm]);
 
   // Funções para gerenciar os diálogos
@@ -1021,7 +1047,7 @@ const Management = () => {
                             <FormLabel>Serviços</FormLabel>
                             <FormControl>
                               <div className="flex flex-wrap gap-2">
-                                {services.map((service) => (
+                                {localServices.map((service) => (
                                   <Button
                                     key={service.service_id}
                                     type="button"

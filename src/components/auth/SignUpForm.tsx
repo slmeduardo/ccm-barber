@@ -262,7 +262,11 @@ export function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
                 <FormItem>
                   <FormLabel>Nome</FormLabel>
                   <FormControl>
-                    <Input placeholder="John Doe" {...field} />
+                    <Input
+                      className="text-sm"
+                      placeholder="John Doe"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -298,7 +302,7 @@ export function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
                           value={countryCode}
                           onValueChange={setCountryCode}
                         >
-                          <SelectTrigger className="w-[100px] rounded-r-none">
+                          <SelectTrigger className="w-[100px] h-8 rounded-r-none">
                             <SelectValue placeholder="País" />
                           </SelectTrigger>
                           <SelectContent>
@@ -315,7 +319,7 @@ export function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
                           }
                           maxLength={15}
                           className={cn(
-                            "flex-1 rounded-l-none border-l-0",
+                            "flex-1 rounded-l-none border-l-0 text-sm",
                             phone &&
                               !isValidPhone &&
                               "border-red-500 focus-visible:ring-red-500"

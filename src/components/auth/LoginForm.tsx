@@ -187,7 +187,7 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
               <FormControl>
                 <div className="flex">
                   <Select value={countryCode} onValueChange={setCountryCode}>
-                    <SelectTrigger className="w-[100px] rounded-r-none">
+                    <SelectTrigger className="w-[100px] h-8 rounded-r-none">
                       <SelectValue placeholder="País" />
                     </SelectTrigger>
                     <SelectContent>
