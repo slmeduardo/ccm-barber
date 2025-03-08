@@ -177,7 +177,7 @@ const Book = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
-        <div className="grid gap-6 grid-cols-2">
+        <div className="grid gap-3 grid-cols-2">
           <div className="flex gap-2">
             <div className="flex flex-col space-y-2 w-full">
               <label className="text-sm font-medium">
@@ -188,7 +188,7 @@ const Book = () => {
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal",
+                      "w-full  justify-start text-left font-normal text-sm",
                       !date && "text-muted-foreground"
                     )}
                   >
@@ -222,7 +222,7 @@ const Book = () => {
             <label className="text-sm font-medium">
               Seu número de telefone:
             </label>
-            <div className="p-2 bg-gray-700 rounded border border-gray-600">
+            <div className="p-2 h-8 text-sm bg-gray-700 rounded border border-gray-600">
               {formatPhoneNumber(authUser?.phone || "")}
             </div>
           </div>
@@ -234,7 +234,7 @@ const Book = () => {
                 onValueChange={setSelectedService}
                 value={selectedService}
               >
-                <SelectTrigger>
+                <SelectTrigger className=" text-sm">
                   <SelectValue placeholder="Selecione um serviço" />
                 </SelectTrigger>
                 <SelectContent>
@@ -254,7 +254,7 @@ const Book = () => {
                 value={selectedEmployee}
                 disabled={!selectedService}
               >
-                <SelectTrigger>
+                <SelectTrigger className=" text-sm">
                   <SelectValue placeholder="Selecione um profissional" />
                 </SelectTrigger>
                 <SelectContent>

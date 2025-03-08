@@ -42,8 +42,14 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid"; // Week & Day View
-import { collection, doc, getDocs, updateDoc } from "firebase/firestore";
-import { Loader2 } from "lucide-react";
+import {
+  collection,
+  doc,
+  getDocs,
+  updateDoc,
+  writeBatch,
+} from "firebase/firestore";
+import { Loader2, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Label } from "./ui/label";
 import { Skeleton } from "./ui/skeleton";
@@ -190,6 +196,7 @@ const Calendar = () => {
     [key: string]: boolean;
   }>({});
   const [hasAppointmentsInDay, setHasAppointmentsInDay] = useState(false);
+  const [deletingTimeSlot, setDeletingTimeSlot] = useState<string | null>(null);
 
   // Usar os slots de tempo das 8:00 às 20:00
   const timeSlots = generateTimeSlots();
@@ -444,7 +451,18 @@ const Calendar = () => {
                   {eventInfo.event.extendedProps.client_id && (
                     <p>
                       <strong>Cliente:</strong>{" "}
-                      {eventInfo.event.extendedProps.client_id}
+                      {eventInfo.event.extendedProps.client_id.includes(
+                        "@s.whatsapp.net"
+                      )
+                        ? `(${eventInfo.event.extendedProps.client_id
+                            .split("@")[0]
+                            .slice(
+                              2,
+                              4
+                            )}) ${eventInfo.event.extendedProps.client_id
+                            .split("@")[0]
+                            .slice(4)}`
+                        : eventInfo.event.extendedProps.client_id}
                     </p>
                   )}
                 </div>
@@ -682,6 +700,121 @@ const Calendar = () => {
   const selectedDatePlusOne = new Date(selectedDate);
   selectedDatePlusOne.setDate(selectedDatePlusOne.getDate() + 1);
 
+  // Função para excluir um agendamento
+  const handleDeleteAppointment = async (time: string) => {
+    if (!selectedEmployee || !selectedDate) return;
+
+    try {
+      setDeletingTimeSlot(time);
+
+      const selectedEmployeeData = employeesData.find(
+        (emp) => emp.id === selectedEmployee
+      );
+
+      if (!selectedEmployeeData) return;
+
+      const hour = getHourFromTimeSlot(time);
+      const quarterSlots = getQuarterSlotsForHour(hour);
+
+      // Encontrar o appointment_id nos slots de 15 minutos para esta hora
+      let appointmentId: string | undefined;
+
+      const updatedEmployeeData = { ...selectedEmployeeData };
+      const dayIndex = updatedEmployeeData.calendar.findIndex(
+        (day) => day.day === selectedDate.replace(/-/g, "/")
+      );
+
+      if (dayIndex === -1) return;
+
+      // Encontrar o appointment_id primeiro
+      updatedEmployeeData.calendar[dayIndex].day_time.forEach((timeSlot) => {
+        if (
+          quarterSlots.includes(timeSlot.hour) &&
+          timeSlot.appointment_id &&
+          timeSlot.appointment_id !== "" &&
+          timeSlot.appointment_id !== "out_of_office" &&
+          timeSlot.appointment_id !== "day_off" &&
+          timeSlot.appointment_id !== "not_in_schedule"
+        ) {
+          appointmentId = timeSlot.appointment_id;
+        }
+      });
+
+      if (!appointmentId) {
+        toast({
+          title: "Erro",
+          description: "Nenhum agendamento encontrado neste horário.",
+          variant: "destructive",
+        });
+        setDeletingTimeSlot(null);
+        return;
+      }
+
+      // Usar writeBatch para garantir operação atômica
+      const batch = writeBatch(db);
+
+      // Atualizar todos os slots que tenham este appointment_id
+      const calendarRef = collection(db, "calendar");
+      const calendarSnapshot = await getDocs(calendarRef);
+
+      calendarSnapshot.forEach((employeeDoc) => {
+        const empData = employeeDoc.data() as EmployeeData;
+        let updated = false;
+
+        empData.calendar.forEach((day) => {
+          day.day_time.forEach((timeSlot) => {
+            if (timeSlot.appointment_id === appointmentId) {
+              timeSlot.appointment_id = "";
+              timeSlot.client_id = "none";
+              timeSlot.service = "none";
+              updated = true;
+            }
+          });
+        });
+
+        if (updated) {
+          batch.set(employeeDoc.ref, empData);
+        }
+      });
+
+      await batch.commit();
+
+      // Atualizar o estado local
+      const updatedOccupiedTimeSlots = { ...occupiedTimeSlots };
+      delete updatedOccupiedTimeSlots[time];
+      setOccupiedTimeSlots(updatedOccupiedTimeSlots);
+
+      toast({
+        title: "Sucesso",
+        description: "Agendamento excluído com sucesso.",
+      });
+
+      // Recarregar os dados atualizados
+      try {
+        const calendarCollection = collection(db, "calendar");
+        const calendarSnapshot = await getDocs(calendarCollection);
+
+        const calendarData = calendarSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as EmployeeData[];
+
+        setEmployeesData(calendarData);
+      } catch (error) {
+        console.error("Erro ao recarregar dados do calendário:", error);
+      }
+    } catch (error) {
+      console.error("Erro ao excluir agendamento:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir agendamento. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingTimeSlot(null);
+    }
+  };
+
   return (
     <div>
       <div className="w-[240px] mb-10 flex flex-col gap-3">
@@ -867,6 +1000,7 @@ const Calendar = () => {
                             <TableHead>Horário</TableHead>
                             <TableHead>Serviço</TableHead>
                             <TableHead>Cliente</TableHead>
+                            <TableHead className="text-center">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -877,7 +1011,41 @@ const Calendar = () => {
                               </TableCell>
                               <TableCell>{event.service}</TableCell>
                               <TableCell>
-                                {event.client_id || "Não informado"}
+                                {event.client_id
+                                  ? event.client_id.includes("@s.whatsapp.net")
+                                    ? `(${event.client_id
+                                        .split("@")[0]
+                                        .slice(2, 4)}) ${event.client_id
+                                        .split("@")[0]
+                                        .slice(4)}`
+                                    : event.client_id
+                                  : "Não informado"}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        onClick={() =>
+                                          handleDeleteAppointment(event.hour)
+                                        }
+                                        disabled={
+                                          deletingTimeSlot === event.hour
+                                        }
+                                        className="p-1.5 rounded-full hover:bg-gray-100/20 focus:outline-none focus:ring-2 focus:ring-destructive/30 transition-colors"
+                                      >
+                                        {deletingTimeSlot === event.hour ? (
+                                          <Loader2 className="h-4 w-4 animate-spin " />
+                                        ) : (
+                                          <Trash2 className="h-4 w-4 " />
+                                        )}
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="text-sm max-w-[300px]">
+                                      <p>Excluir agendamento</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                               </TableCell>
                             </TableRow>
                           ))}
