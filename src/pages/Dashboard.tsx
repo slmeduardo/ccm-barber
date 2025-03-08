@@ -2,7 +2,7 @@ import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { useServiceStats, useWebUsers } from "@/hooks/useFirestore";
-import { Clock, Home, LayoutDashboard, Settings, Users } from "lucide-react";
+import { Users } from "lucide-react";
 import { useState } from "react";
 import { Link, Navigate, Outlet, useLocation } from "react-router-dom";
 import {
@@ -53,57 +53,61 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       {/* Cabeçalho do Dashboard */}
-      <header className="bg-card shadow-md py-4">
+      <header className="bg-card shadow-md">
         <div className="container mx-auto px-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Painel de Administração</h1>
-          <Link
-            to="/"
-            className="flex items-center text-primary hover:text-primary/80 transition-colors"
-          >
-            <Home className="mr-2 h-5 w-5" />
-            <span>Página Inicial</span>
-          </Link>
+          <div className="flex items-center gap-4">
+            <div>
+              <Link
+                to="/"
+                className="flex items-center text-primary hover:text-primary/80 transition-colors"
+              >
+                <img
+                  src="/uploads/3938081c-f339-4921-b90f-f5ff2a42361d.png"
+                  alt="Logo"
+                  className="w-16 h-16"
+                />
+              </Link>
+            </div>
+
+            <nav className="flex space-x-4">
+              <Link
+                to="/dashboard"
+                className={`flex text-sm items-center px-4 py-2 rounded-md transition-colors ${
+                  getActiveTab() === "dashboard"
+                    ? "text-primary-foreground"
+                    : "text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                <span>Dashboard</span>
+              </Link>
+              <Link
+                to="/dashboard/management"
+                className={`flex text-sm items-center px-4 py-2 rounded-md transition-colors ${
+                  getActiveTab() === "management"
+                    ? "text-primary-foreground"
+                    : "text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                <span>Manutenção</span>
+              </Link>
+              <Link
+                to="/dashboard/schedules"
+                className={`flex text-sm items-center px-4 py-2 rounded-md transition-colors ${
+                  getActiveTab() === "schedules"
+                    ? "text-primary-foreground"
+                    : "text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                <span>Calendário</span>
+              </Link>
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-4">user</div>
         </div>
       </header>
 
-      {/* Navegação do Dashboard */}
-      <div className="container mx-auto px-4 py-6">
-        <nav className="flex space-x-4 mb-8 border-b pb-2">
-          <Link
-            to="/dashboard"
-            className={`flex items-center px-4 py-2 rounded-md transition-colors ${
-              getActiveTab() === "dashboard"
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted"
-            }`}
-          >
-            <LayoutDashboard className="mr-2 h-5 w-5" />
-            <span>Dashboard</span>
-          </Link>
-          <Link
-            to="/dashboard/management"
-            className={`flex items-center px-4 py-2 rounded-md transition-colors ${
-              getActiveTab() === "management"
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted"
-            }`}
-          >
-            <Settings className="mr-2 h-5 w-5" />
-            <span>Manutenção</span>
-          </Link>
-          <Link
-            to="/dashboard/schedules"
-            className={`flex items-center px-4 py-2 rounded-md transition-colors ${
-              getActiveTab() === "schedules"
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted"
-            }`}
-          >
-            <Clock className="mr-2 h-5 w-5" />
-            <span>Horários</span>
-          </Link>
-        </nav>
-
+      <div className="container mx-auto px-4">
         {/* Conteúdo do Dashboard */}
         {location.pathname === "/dashboard" && (
           <div className="space-y-8">

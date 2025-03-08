@@ -254,6 +254,50 @@ export function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
     <>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <div className="col-span-2">
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Telefone</FormLabel>
+                  <FormControl>
+                    <div className="flex">
+                      <Select
+                        value={countryCode}
+                        onValueChange={setCountryCode}
+                      >
+                        <SelectTrigger className="w-[100px] h-8 rounded-r-none">
+                          <SelectValue placeholder="País" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="+55">🇧🇷 +55</SelectItem>
+                          <SelectItem value="+1">🇺🇸 +1</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Input
+                        placeholder="(00) 00000-0000"
+                        value={phone}
+                        onChangeCapture={(event) =>
+                          handlePhoneChange(event, field)
+                        }
+                        maxLength={15}
+                        className={cn(
+                          "flex-1 rounded-l-none border-l-0 text-sm",
+                          phone &&
+                            !isValidPhone &&
+                            "border-red-500 focus-visible:ring-red-500"
+                        )}
+                        {...field}
+                      />
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -289,50 +333,6 @@ export function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
                 </FormItem>
               )}
             />
-            <div className="col-span-2">
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Telefone</FormLabel>
-                    <FormControl>
-                      <div className="flex">
-                        <Select
-                          value={countryCode}
-                          onValueChange={setCountryCode}
-                        >
-                          <SelectTrigger className="w-[100px] h-8 rounded-r-none">
-                            <SelectValue placeholder="País" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="+55">🇧🇷 +55</SelectItem>
-                            <SelectItem value="+1">🇺🇸 +1</SelectItem>
-                          </SelectContent>
-                        </Select>
-
-                        <Input
-                          placeholder="(00) 00000-0000"
-                          value={phone}
-                          onChangeCapture={(event) =>
-                            handlePhoneChange(event, field)
-                          }
-                          maxLength={15}
-                          className={cn(
-                            "flex-1 rounded-l-none border-l-0 text-sm",
-                            phone &&
-                              !isValidPhone &&
-                              "border-red-500 focus-visible:ring-red-500"
-                          )}
-                          {...field}
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
             <FormField
               control={form.control}
               name="password"
