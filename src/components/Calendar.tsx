@@ -46,11 +46,12 @@ import {
   collection,
   doc,
   getDocs,
+  onSnapshot,
   updateDoc,
   writeBatch,
 } from "firebase/firestore";
 import { Loader2, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Label } from "./ui/label";
 import { Skeleton } from "./ui/skeleton";
 
@@ -79,9 +80,15 @@ interface CalendarEvent {
   end: string;
   extendedProps: {
     client_id?: string;
-    hour: string;
+    hour?: string;
     service: string;
+    startHour?: string;
+    endHour?: string;
+    appointment_id?: string;
   };
+  allDay?: boolean;
+  display?: string;
+  backgroundColor?: string;
 }
 
 interface EventDetailsDialogProps {
@@ -198,172 +205,248 @@ const Calendar = () => {
   const [hasAppointmentsInDay, setHasAppointmentsInDay] = useState(false);
   const [deletingTimeSlot, setDeletingTimeSlot] = useState<string | null>(null);
 
+  // Referência para o componente FullCalendar
+  const calendarRef = useRef<FullCalendar | null>(null);
+
   // Usar os slots de tempo das 8:00 às 20:00
   const timeSlots = generateTimeSlots();
   // Usar apenas as horas inteiras para os checkboxes na interface
   const hourlySlots = generateHourlySlots();
 
   useEffect(() => {
-    const fetchCalendar = async () => {
-      try {
-        const calendarCollection = collection(db, "calendar");
-        const calendarSnapshot = await getDocs(calendarCollection);
+    // Substituir a busca única por um listener em tempo real
+    const calendarCollection = collection(db, "calendar");
+    setLoading(true);
 
-        const calendarData = calendarSnapshot.docs.map((doc) => ({
+    // Configurar o listener em tempo real
+    const unsubscribe = onSnapshot(
+      calendarCollection,
+      (snapshot) => {
+        const calendarData = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         })) as EmployeeData[];
 
         setEmployeesData(calendarData);
-        if (calendarData.length > 0) {
+        if (calendarData.length > 0 && !selectedEmployee) {
           setSelectedEmployee(calendarData[0].id);
         }
-      } catch (error) {
-        console.error("Erro ao buscar calendário:", error);
-      } finally {
+        setLoading(false);
+
+        // Força a atualização do calendário quando dados são alterados
+        if (calendarRef.current) {
+          calendarRef.current.getApi().refetchEvents();
+          console.log("Calendário atualizado em tempo real");
+        }
+      },
+      (error) => {
+        console.error("Erro ao observar mudanças no calendário:", error);
         setLoading(false);
       }
-    };
+    );
 
-    fetchCalendar();
-  }, []);
+    // Limpar o listener quando o componente for desmontado
+    return () => unsubscribe();
+  }, [selectedEmployee]);
 
   useEffect(() => {
-    const fetchServices = async () => {
-      try {
-        const servicesCollection = collection(db, "services");
-        const servicesSnapshot = await getDocs(servicesCollection);
+    // Substituir a busca única por um listener em tempo real
+    const servicesCollection = collection(db, "services");
+    setLoadingServices(true);
 
-        const servicesList = servicesSnapshot.docs.map((doc) => ({
+    // Configurar o listener em tempo real
+    const unsubscribe = onSnapshot(
+      servicesCollection,
+      (snapshot) => {
+        const servicesList = snapshot.docs.map((doc) => ({
           service_id: doc.id,
           ...doc.data(),
         })) as Service[];
 
         setServices(servicesList);
-      } catch (error) {
-        console.error("Erro ao buscar serviços:", error);
-      } finally {
         setLoadingServices(false);
-      }
-    };
 
-    fetchServices();
-  }, []);
-
-  useEffect(() => {
-    if (!selectedEmployee || !employeesData.length || !services.length) return;
-
-    const employeeData = employeesData.find(
-      (emp) => emp.id === selectedEmployee
-    );
-    if (!employeeData) return;
-
-    const calendarEvents = employeeData.calendar.flatMap<CalendarEvent>(
-      (day) => {
-        // Verifica se é um dia de folga
-        const isDayOff = day.day_time[0]?.appointment_id === "day_off";
-
-        if (isDayOff) {
-          return [
-            {
-              id: crypto.randomUUID(),
-              title: "Dia de Folga",
-              date: day.day.replace(/\//g, "-"),
-              start: `${day.day.replace(/\//g, "-")}T00:00:00`,
-              end: `${day.day.replace(/\//g, "-")}T23:59:59`,
-              allDay: true,
-              extendedProps: {
-                service: "day_off",
-                hour: "00:00",
-              },
-            },
-          ];
-        }
-
-        // Agrupa os horários out_of_office por hora
-        const outOfOfficeByHour = new Map<string, DayTime>();
-        day.day_time.forEach((appointment) => {
-          if (appointment.appointment_id === "out_of_office") {
-            const baseHour = appointment.hour.split(":")[0];
-            if (!outOfOfficeByHour.has(baseHour)) {
-              outOfOfficeByHour.set(baseHour, appointment);
-            }
-          }
-        });
-
-        // Processa os horários normais e out_of_office agrupados
-        return [
-          // Adiciona eventos out_of_office agrupados
-          ...Array.from(outOfOfficeByHour.values()).map((appointment) => ({
-            id: crypto.randomUUID(),
-            title: "Horário Indisponível",
-            date: day.day.replace(/\//g, "-"),
-            start: `${day.day.replace(/\//g, "-")}T${appointment.hour}`,
-            end: `${day.day.replace(/\//g, "-")}T${
-              appointment.hour.split(":")[0]
-            }:59`,
-            extendedProps: {
-              service: "out_of_office",
-              startHour: appointment.hour,
-              endHour: `${appointment.hour.split(":")[0]}:59`,
-              hour: appointment.hour,
-            },
-          })),
-          // Adiciona eventos normais
-          ...day.day_time
-            .filter(
-              (appointment) =>
-                appointment.service !== "none" &&
-                appointment.appointment_id !== "day_off" &&
-                appointment.appointment_id !== "out_of_office" &&
-                appointment.appointment_id !== "not_in_schedule" &&
-                appointment.service !== "not_in_schedule"
-            )
-            .map((appointment) => {
-              const service = services.find(
-                (s) => s.description === appointment.service
-              );
-              const durationInMinutes = (service?.service_duration || 1) * 15;
-
-              const startDate = new Date(
-                `${day.day.replace(/\//g, "-")}T${appointment.hour}`
-              );
-              const endDate = new Date(
-                startDate.getTime() + durationInMinutes * 60000
-              );
-
-              return {
-                id: appointment.appointment_id || crypto.randomUUID(),
-                title: `${appointment.service} - ${appointment.hour}`,
-                date: day.day.replace(/\//g, "-"),
-                start: startDate.toISOString(),
-                end: endDate.toISOString(),
-                extendedProps: {
-                  client_id: appointment.client_id,
-                  hour: appointment.hour,
-                  service: appointment.service,
-                },
-              };
-            }),
-        ];
-      }
-    );
-
-    // Correção do problema de tipo no reduce
-    const uniqueEvents = calendarEvents.reduce<CalendarEvent[]>(
-      (acc, current) => {
-        const x = acc.find((item) => item.id === current.id);
-        if (!x) {
-          return acc.concat([current]);
-        } else {
-          return acc;
+        // Força a atualização do calendário quando serviços são alterados
+        if (calendarRef.current && !loading) {
+          calendarRef.current.getApi().refetchEvents();
+          console.log("Calendário atualizado após mudança nos serviços");
         }
       },
-      []
+      (error) => {
+        console.error("Erro ao observar mudanças nos serviços:", error);
+        setLoadingServices(false);
+      }
     );
 
-    setEvents(uniqueEvents);
-  }, [selectedEmployee, employeesData, services]);
+    // Limpar o listener quando o componente for desmontado
+    return () => unsubscribe();
+  }, [loading]);
+
+  useEffect(() => {
+    if (!selectedEmployee || loadingServices || loading) return;
+
+    const selectedEmployeeData = employeesData.find(
+      (employee) => employee.id === selectedEmployee
+    );
+
+    if (!selectedEmployeeData) return;
+
+    // Extrair eventos do calendário do funcionário selecionado
+    let calendarEvents = selectedEmployeeData.calendar.flatMap((day) => [
+      // Eventos de dia de folga
+      ...day.day_time
+        .filter(
+          (appointment) =>
+            appointment.appointment_id === "day_off" ||
+            appointment.service === "day_off"
+        )
+        .map((appointment) => ({
+          id: crypto.randomUUID(),
+          title: "Dia de Folga",
+          date: day.day.replace(/\//g, "-"),
+          start: `${day.day.replace(/\//g, "-")}T00:00`,
+          end: `${day.day.replace(/\//g, "-")}T23:59`,
+          extendedProps: {
+            service: "day_off",
+          },
+          allDay: true,
+          display: "background",
+          backgroundColor: "#eef2ff",
+        })),
+      // Eventos de horário indisponível
+      ...day.day_time
+        .filter(
+          (appointment) =>
+            (appointment.appointment_id === "out_of_office" ||
+              appointment.service === "out_of_office") &&
+            // Mostrar apenas eventos com minutos "00" (horas exatas)
+            appointment.hour.split(":")[1] === "00"
+        )
+        .map((appointment) => ({
+          id: `out_of_office_${day.day}_${appointment.hour}`, // ID composto para garantir unicidade por hora
+          title: `Indisponível - ${appointment.hour}`,
+          date: day.day.replace(/\//g, "-"),
+          start: `${day.day.replace(/\//g, "-")}T${appointment.hour}`,
+          end: `${day.day.replace(/\//g, "-")}T${
+            appointment.hour.split(":")[0]
+          }:59`,
+          extendedProps: {
+            service: "out_of_office",
+            startHour: appointment.hour,
+            endHour: `${appointment.hour.split(":")[0]}:59`,
+            hour: appointment.hour,
+          },
+        })),
+      // Adiciona eventos normais
+      ...day.day_time
+        .filter(
+          (appointment) =>
+            appointment.service !== "none" &&
+            appointment.appointment_id !== "day_off" &&
+            appointment.appointment_id !== "out_of_office" &&
+            appointment.appointment_id !== "not_in_schedule" &&
+            appointment.service !== "not_in_schedule" &&
+            // Mostrar apenas eventos com minutos "00" (horas exatas)
+            appointment.hour.split(":")[1] === "00"
+        )
+        .map((appointment) => {
+          const service = services.find(
+            (s) => s.description === appointment.service
+          );
+          const durationInMinutes = (service?.service_duration || 1) * 15;
+
+          const startDate = new Date(
+            `${day.day.replace(/\//g, "-")}T${appointment.hour}`
+          );
+          const endDate = new Date(
+            startDate.getTime() + durationInMinutes * 60000
+          );
+
+          return {
+            id: appointment.appointment_id || crypto.randomUUID(),
+            title: `${appointment.service} - ${appointment.hour}`,
+            date: day.day.replace(/\//g, "-"),
+            start: startDate.toISOString(),
+            end: endDate.toISOString(),
+            extendedProps: {
+              client_id: appointment.client_id,
+              hour: appointment.hour,
+              service: appointment.service,
+            },
+          };
+        }),
+    ]);
+
+    // Filtrar eventos duplicados - manter apenas um evento por ID
+    const uniqueIdsMap = new Map();
+    const uniqueOutOfOfficeMap = new Map(); // Para rastrear eventos out_of_office por hora
+
+    calendarEvents = calendarEvents.filter((event) => {
+      // Se o evento for out_of_office, verificar se já temos um para esta hora e dia
+      if (event.extendedProps.service === "out_of_office") {
+        // Verificar se temos o horário no title (formato: "Indisponível - HH:MM")
+        const titleHour = event.title.includes("Indisponível - ")
+          ? event.title.split("Indisponível - ")[1]
+          : "";
+
+        const key = `${event.date}_${titleHour || "unknown"}`;
+        const isDuplicate = uniqueOutOfOfficeMap.has(key);
+
+        if (!isDuplicate) {
+          uniqueOutOfOfficeMap.set(key, true);
+          return true;
+        }
+
+        // Se for duplicado, não adiciona
+        console.log(
+          `Evento de horário indisponível duplicado removido: ${event.title}`
+        );
+        return false;
+      }
+
+      // Para outros eventos, manter a lógica existente
+      if (!event.id || event.extendedProps.service === "day_off") {
+        return true;
+      }
+
+      // Verifica se já existe um evento com este ID
+      const isDuplicate = uniqueIdsMap.has(event.id);
+      if (!isDuplicate) {
+        uniqueIdsMap.set(event.id, true);
+        return true;
+      }
+
+      // Se for duplicado, não adiciona
+      console.log(
+        `Evento duplicado removido: ${event.title} (ID: ${event.id})`
+      );
+      return false;
+    });
+
+    setEvents(calendarEvents);
+  }, [employeesData, selectedEmployee, services, loading, loadingServices]);
+
+  // Efeito para atualizar o calendário quando os eventos mudarem
+  useEffect(() => {
+    if (calendarRef.current && events.length > 0) {
+      const calendarApi = calendarRef.current.getApi();
+
+      // Remover todos os eventos existentes
+      calendarApi.removeAllEvents();
+
+      // Adicionar os novos eventos
+      calendarApi.addEventSource({ events });
+
+      // Força a rerenderização do calendário
+      calendarApi.refetchEvents();
+
+      console.log(
+        "Calendário atualizado em tempo real com",
+        events.length,
+        "eventos"
+      );
+    }
+  }, [events]);
 
   const handleEventClick = (info: EventClickArg) => {
     setSelectedEvent(info.event);
@@ -402,7 +485,14 @@ const Calendar = () => {
         {isDayOff ? (
           <strong>{isMonthView ? "Dia de Folga" : ""}</strong>
         ) : isOutOfOffice ? (
-          <strong>{isMonthView ? "Horário Indisponível" : ""}</strong>
+          <div className="flex flex-col">
+            <strong>Horário Indisponível</strong>
+            {eventInfo.event.extendedProps.hour && (
+              <span className="text-sm font-medium">
+                {eventInfo.event.extendedProps.hour}
+              </span>
+            )}
+          </div>
         ) : (
           <>
             {eventInfo.event.extendedProps.hour && (
@@ -1095,6 +1185,7 @@ const Calendar = () => {
           center: "title",
           right: "dayGridMonth,timeGridWeek,timeGridDay", // View Switcher
         }}
+        ref={calendarRef}
       />
     </div>
   );
