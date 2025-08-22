@@ -18,7 +18,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Verificar se há um usuário no localStorage ao carregar
     const storedUser = localStorage.getItem("currentUser");
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+      } catch (error) {
+        console.error("Error parsing stored user:", error);
+        localStorage.removeItem("currentUser");
+      }
     }
     setLoading(false);
   }, []);

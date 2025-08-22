@@ -50,15 +50,21 @@ export const useWebUsers = () => {
 
   useEffect(() => {
     const fetchWebUsers = async () => {
-      const webUsersCollection = collection(db, "webUsers");
-      const webUsersSnapshot = await getDocs(webUsersCollection);
+      try {
+        const webUsersCollection = collection(db, "webUsers");
+        const webUsersSnapshot = await getDocs(webUsersCollection);
 
-      const webUsersList = webUsersSnapshot.docs.map((doc) => ({
-        user_id: doc.id,
-        ...doc.data(),
-      })) as webuser[];
+        const webUsersList = webUsersSnapshot.docs.map((doc) => ({
+          user_id: doc.id,
+          ...doc.data(),
+        })) as webuser[];
 
-      setWebUsers(webUsersList);
+        setWebUsers(webUsersList);
+      } catch (error) {
+        console.error("Error fetching webUsers:", error);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchWebUsers();
@@ -427,8 +433,6 @@ export const useServiceStats = () => {
         const hasRealData =
           byMonth.some((item) => item.count > 0) ||
           totalByEmployeeArray.some((item) => item.count > 0);
-
-        console.log(byMonth, totalByEmployeeArray, "teste");
 
         if (!hasRealData) {
           // Dados de exemplo para meses

@@ -61,14 +61,15 @@ export function ProfileMenu({ userName, isAdmin = false }: ProfileMenuProps) {
         </DropdownMenuItem>
         <DropdownMenuItem>Perfil</DropdownMenuItem>
         <DropdownMenuItem>Configurações</DropdownMenuItem>
-        {isAdmin && !isDashboard && (
-          <DropdownMenuItem asChild>
-            <Link to="/dashboard" className="flex items-center">
-              <LayoutDashboard className="h-4 w-4 mr-2" />
-              <span>Dashboard</span>
-            </Link>
-          </DropdownMenuItem>
-        )}
+
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link to="/dashboard" className="flex items-center">
+            <LayoutDashboard className="h-4 w-4 mr-2" />
+            <span>Dashboard</span>
+          </Link>
+        </DropdownMenuItem>
+
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout} className="text-red-600">
           Sair

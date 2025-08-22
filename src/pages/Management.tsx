@@ -59,9 +59,8 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Navigate } from "react-router-dom";
 import * as z from "zod";
 
 type ServiceType = {
@@ -148,19 +147,18 @@ const Management = () => {
     },
   });
 
-  if (webUser?.isAdmin === false) {
-    return <Navigate to="/" />;
-  }
-
-  const weekDays = [
-    "Domingo",
-    "Segunda",
-    "Terça",
-    "Quarta",
-    "Quinta",
-    "Sexta",
-    "Sábado",
-  ];
+  const weekDays = useMemo(
+    () => [
+      "Domingo",
+      "Segunda",
+      "Terça",
+      "Quarta",
+      "Quinta",
+      "Sexta",
+      "Sábado",
+    ],
+    []
+  );
 
   // Usar os slots de tempo completos para o calendário
   const timeSlots = generateTimeSlots();
@@ -168,7 +166,7 @@ const Management = () => {
   const hourlySlots = generateHourlySlots();
 
   // Função para carregar o estado inicial dos checkboxes do Firestore
-  const loadInitialCheckboxStates = async () => {
+  const loadInitialCheckboxStates = useCallback(async () => {
     try {
       const initialStates: { [key: string]: boolean } = {};
 
@@ -218,16 +216,28 @@ const Management = () => {
       console.error("Erro ao carregar estados iniciais:", error);
       setInitialLoading(false);
     }
-  };
+  }, [employees, weekDays]);
 
-  // Corrigindo o useEffect para carregar estados de checkbox
+  // Efeito para sincronizar os serviços do hook com o estado local
   useEffect(() => {
-    if (loading) return;
+    if (services && services.length > 0) {
+      setLocalServices(services as ServiceType[]);
+    }
+  }, [services]);
 
-    if (employees.length > 0) {
+  // Efeito para sincronizar os employees do hook com o estado local
+  useEffect(() => {
+    if (employees && employees.length > 0 && employees[0]?.employees) {
+      setTeam(employees[0].employees);
+    }
+  }, [employees]);
+
+  // Efeito para carregar o estado inicial dos checkboxes
+  useEffect(() => {
+    if (employees && employees.length > 0 && !initialLoading) {
       loadInitialCheckboxStates();
     }
-  }, [employees, loading]);
+  }, [employees, initialLoading, loadInitialCheckboxStates]);
 
   const handleCheckboxChange = async (day: string, hourSlot: string) => {
     try {
@@ -400,15 +410,6 @@ const Management = () => {
       setIsUpdating(false);
     }
   };
-
-  // Adicione este useEffect para sincronizar os serviços do Firestore com o estado local
-  useEffect(() => {
-    if (loadingServices) return;
-
-    if (services.length > 0) {
-      setLocalServices(services);
-    }
-  }, [services, loadingServices]);
 
   // Modifique a função handleDeleteService para atualizar o estado local
   const handleDeleteService = async (serviceName: string) => {
@@ -688,33 +689,6 @@ const Management = () => {
     }
   };
 
-  // Corrigindo os useEffect condicionais
-  useEffect(() => {
-    if (employees.length === 0) return;
-
-    setTeam(employees[0]?.employees || []);
-  }, [employees]);
-
-  useEffect(() => {
-    if (!editingService) return;
-
-    serviceForm.reset({
-      name: editingService.name,
-      description: editingService.description,
-      preco: editingService.preco,
-      service_duration: editingService.service_duration,
-    });
-  }, [editingService, serviceForm]);
-
-  useEffect(() => {
-    if (!editingEmployee) return;
-
-    employeeForm.reset({
-      employee_name: editingEmployee.employee_name,
-      services: editingEmployee.services,
-    });
-  }, [editingEmployee, employeeForm]);
-
   // Funções para gerenciar os diálogos
   const handleServiceDialogChange = (open: boolean) => {
     setIsServiceDialogOpen(open);
@@ -744,7 +718,7 @@ const Management = () => {
     return phone.split("@")[0].slice(2);
   };
 
-  if (loading || loadingServices || initialLoading) {
+  if (loading) {
     return (
       <>
         <div className="flex justify-center items-center my-20 gap-4">

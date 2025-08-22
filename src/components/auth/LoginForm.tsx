@@ -33,7 +33,7 @@ const formSchema = z.object({
   password: z.string().min(1, "A senha é obrigatória"),
 });
 
-export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
+export function LoginForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -139,15 +139,17 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
 
       // Se chegou aqui, a senha está correta
       // Salve os dados do usuário na sessão, local storage, ou context
-      localStorage.setItem(
-        "user",
-        JSON.stringify({
-          user_id: userData.user_id,
-          name: userData.name,
-          email: userData.email,
-          isAdmin: userData.isAdmin,
-        })
-      );
+      const userToStore = {
+        user_id: userDoc.id, // Usar o ID do documento
+        name: userData.name,
+        phone: userData.phone,
+        email: userData.email,
+        password: userData.password,
+        isAdmin: userData.isAdmin,
+        createdAt: userData.createdAt,
+      };
+
+      localStorage.setItem("currentUser", JSON.stringify(userToStore));
 
       // Login bem-sucedido - use a função login do contexto, se disponível
       login?.(userData);
@@ -157,11 +159,7 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
         description: `Bem-vindo(a) de volta, ${userData.name}!`,
       });
 
-      // Redireciona ou executa alguma função após o login
-      onSuccess?.();
-
-      // Navegue para a página apropriada
-      userData.isAdmin ? navigate("/dashboard") : navigate("/");
+      navigate("/dashboard");
     } catch (error) {
       console.error("Erro no login:", error);
       toast({
