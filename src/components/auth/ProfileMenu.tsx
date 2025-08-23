@@ -9,8 +9,8 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
-import { Calendar, Home, LayoutDashboard, User } from "lucide-react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Calendar, LayoutDashboard, User } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 
 interface ProfileMenuProps {
   userName: string;
@@ -18,10 +18,8 @@ interface ProfileMenuProps {
 }
 
 export function ProfileMenu({ userName, isAdmin = false }: ProfileMenuProps) {
-  const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
-  const isDashboard = location.pathname.includes("/dashboard");
 
   const handleLogout = async () => {
     try {
@@ -29,8 +27,8 @@ export function ProfileMenu({ userName, isAdmin = false }: ProfileMenuProps) {
       await signOut(auth);
       // Fazer logout no contexto de autenticação
       logout();
-      // Redirecionar para a página de autenticação
-      navigate("/auth");
+      // Redirecionar para a página de management (padrão)
+      navigate("/dashboard/management");
     } catch (error) {
       console.error("Erro ao fazer logout:", error);
     }
@@ -45,30 +43,22 @@ export function ProfileMenu({ userName, isAdmin = false }: ProfileMenuProps) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {isDashboard && (
-          <DropdownMenuItem asChild>
-            <Link to="/" className="flex items-center">
-              <Home className="h-4 w-4 mr-2" />
-              <span>Voltar ao site</span>
-            </Link>
-          </DropdownMenuItem>
-        )}
         <DropdownMenuItem asChild>
-          <Link to="/appointments" className="flex items-center">
-            <Calendar className="h-4 w-4 mr-2" />
-            <span>Meus Agendamentos</span>
+          <Link to="/dashboard/management" className="flex items-center">
+            <LayoutDashboard className="h-4 w-4 mr-2" />
+            <span>Manutenção</span>
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem>Perfil</DropdownMenuItem>
-        <DropdownMenuItem>Configurações</DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/dashboard/schedules" className="flex items-center">
+            <Calendar className="h-4 w-4 mr-2" />
+            <span>Calendário</span>
+          </Link>
+        </DropdownMenuItem>
 
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to="/dashboard" className="flex items-center">
-            <LayoutDashboard className="h-4 w-4 mr-2" />
-            <span>Dashboard</span>
-          </Link>
-        </DropdownMenuItem>
+        <DropdownMenuItem>Perfil</DropdownMenuItem>
+        <DropdownMenuItem>Configurações</DropdownMenuItem>
 
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout} className="text-red-600">

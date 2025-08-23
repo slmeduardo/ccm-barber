@@ -6,14 +6,23 @@ import { useNavigate } from "react-router-dom";
 
 export function AuthPage() {
   const [isLoginForm, setIsLoginForm] = useState(true);
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) {
-      navigate("/");
+    if (user && !loading) {
+      navigate("/dashboard/management");
     }
-  }, [user, navigate]);
+  }, [user, loading, navigate]);
+
+  // Aguardar o carregamento do contexto de autenticação
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Carregando...
+      </div>
+    );
+  }
 
   if (user) {
     return null; // Usuário será redirecionado pelo useEffect

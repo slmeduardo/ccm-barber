@@ -1,29 +1,27 @@
-// Comentado: imports removidos pois não são mais necessários
-// import { type ChartConfig } from "@/components/ui/chart";
-// import { useAuth } from "@/contexts/AuthContext";
-// import { useServiceStats, useWebUsers } from "@/hooks/useFirestore";
-// import { useState } from "react";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { ProfileMenu } from "@/components/auth/ProfileMenu";
+import { useAuth } from "@/contexts/AuthContext";
+import { useWebUsers } from "@/hooks/useFirestore";
+import { Link, Navigate, Outlet, useLocation } from "react-router-dom";
 
 export default function Dashboard() {
-  // Comentado: obrigação de login removida
-  // const { user: authUser } = useAuth();
-  // const { webUsers } = useWebUsers();
-  // const { serviceStats, loading: statsLoading } = useServiceStats();
-  // const webUser = webUsers.find((user) => user.user_id === authUser?.user_id);
+  const { user: authUser, loading } = useAuth();
+  const { webUsers } = useWebUsers();
+  const webUser = webUsers.find((user) => user.user_id === authUser?.user_id);
   const location = useLocation();
-  // Comentado: variáveis removidas pois não são mais necessárias
-  // const [selectedEmployee, setSelectedEmployee] = useState<string>("todos");
-  // const chartConfig = {
-  //   services: {
-  //     label: "Serviços",
-  //     color: "#2563eb",
-  //   },
-  // } satisfies ChartConfig;
-  // const servicesChartData = serviceStats.byMonth.map((item) => ({
-  //   month: item.month,
-  //   services: item.count,
-  // }));
+
+  // Aguardar o carregamento do contexto de autenticação
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Carregando...
+      </div>
+    );
+  }
+
+  // Proteção de rota: redirecionar para login se não estiver autenticado
+  if (!authUser) {
+    return <Navigate to="/auth" replace />;
+  }
 
   // Determinar qual aba está ativa com base na URL
   const getActiveTab = () => {
@@ -76,7 +74,14 @@ export default function Dashboard() {
             </nav>
           </div>
 
-          <div className="flex items-center gap-4">user</div>
+          <div className="flex items-center gap-4">
+            {authUser && webUser && (
+              <ProfileMenu
+                userName={webUser.name || authUser.email || "Usuário"}
+                isAdmin={webUser.isAdmin}
+              />
+            )}
+          </div>
         </div>
       </header>
 

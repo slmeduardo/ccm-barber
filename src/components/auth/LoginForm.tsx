@@ -159,7 +159,8 @@ export function LoginForm() {
         description: `Bem-vindo(a) de volta, ${userData.name}!`,
       });
 
-      navigate("/dashboard");
+      // O redirecionamento será feito automaticamente pelo AuthPage
+      // quando detectar que o usuário está logado
     } catch (error) {
       console.error("Erro no login:", error);
       toast({
